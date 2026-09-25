@@ -8,25 +8,28 @@ import org.kde.kcmutils as KCM
 //
 // 用 KCM.SimpleKCM 而不是自己写标题：页面标题、四周留白、滚动都由 KCM 框架渲染，
 // 这样与 Plasma 内置的配置页（比如「键盘快捷键」）视觉一致。
-// 之前手写 Kirigami.Heading，字号粗细和留白都对不上，就是这个原因。
 //
 // 这几项都由浮层消费，所以本组件会把它们推给 helper，再由浮层读走：
 // 设置页 → 面板组件 → helper(Config) → 快照里的 @config 行 → 浮层。
+//
+// 控件为什么不直接绑 cfg_<键>：框架把配置值赋给 cfg_<键> 的时机不保证，
+// 而且控件自己初始化时会先跑到第 0 项——早期版本用
+// `onCurrentIndexChanged: cfg_x = currentValue` 回写，初始化那一下就把配置里的值
+// 冲成了列表第一项（位置被冲成 bottom，背景被冲成默认值，保存时那一项还会被当成
+// 默认值删掉）。所以显示一律读 plasmoid.configuration（任何时候都是真值），
+// 只在用户真的动了控件时才回写 cfg_<键>，保存交给框架。
 KCM.SimpleKCM {
     id: page
 
     title: "外观"
 
-    // 下拉框不能用 property alias 指到 ComboBox.currentValue：那是控件内部属性，
-    // 别名解析不到，KCM 加载时会报 Setting initial properties failed，
-    // 整页的值既读不出也存不进（症状就是「设置项改了没反应」）。
-    // 照 KDE 自家设置页（kclock）的写法：普通属性 + onCurrentIndexChanged 回写。
-    property string cfg_overlayPosition
-    property string cfg_backgroundStyle
-    property alias cfg_maxColumns: columnsBox.value
-    property alias cfg_showWindowTitle: titleBox.checked
+    // 框架赋值的目标，保存时读的就是它们。初值取配置真值，两者一致。
+    property string cfg_overlayPosition: plasmoid.configuration.overlayPosition
+    property int cfg_maxColumns: plasmoid.configuration.maxColumns
+    property bool cfg_showWindowTitle: plasmoid.configuration.showWindowTitle
+    property string cfg_backgroundStyle: plasmoid.configuration.backgroundStyle
 
-    // 按值找下拉项下标；找不到就落到第一项。
+    // 按值找下拉项下标；值对不上（配置里是空或旧值）就落到第一项。
     function indexOfValue(box, value) {
         for (var i = 0; i < box.model.length; i++) {
             if (box.model[i].value === value) {
@@ -48,9 +51,8 @@ KCM.SimpleKCM {
                 { value: "center", text: "屏幕中央" },
                 { value: "top", text: "屏幕顶部居中" }
             ]
-            onCurrentIndexChanged: page.cfg_overlayPosition = currentValue
-            Component.onCompleted: currentIndex = page.indexOfValue(positionBox,
-                                                                    page.cfg_overlayPosition)
+            currentIndex: page.indexOfValue(positionBox, plasmoid.configuration.overlayPosition)
+            onActivated: page.cfg_overlayPosition = currentValue
         }
 
         QQC2.SpinBox {
@@ -59,6 +61,8 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: "最多列数"
             from: 1
             to: 8
+            value: plasmoid.configuration.maxColumns
+            onValueModified: page.cfg_maxColumns = value
         }
 
         QQC2.CheckBox {
@@ -66,6 +70,8 @@ KCM.SimpleKCM {
 
             Kirigami.FormData.label: "显示窗口标题"
             text: "在应用名下面显示窗口标题"
+            checked: plasmoid.configuration.showWindowTitle
+            onToggled: page.cfg_showWindowTitle = checked
         }
 
         QQC2.ComboBox {
@@ -78,9 +84,8 @@ KCM.SimpleKCM {
                 { value: "translucent", text: "半透明（能透出桌面）" },
                 { value: "opaque", text: "完全不透明" }
             ]
-            onCurrentIndexChanged: page.cfg_backgroundStyle = currentValue
-            Component.onCompleted: currentIndex = page.indexOfValue(styleBox,
-                                                                    page.cfg_backgroundStyle)
+            currentIndex: page.indexOfValue(styleBox, plasmoid.configuration.backgroundStyle)
+            onActivated: page.cfg_backgroundStyle = currentValue
         }
     }
 }

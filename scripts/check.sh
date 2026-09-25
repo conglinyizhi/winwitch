@@ -94,6 +94,15 @@ if command -v python3 >/dev/null 2>&1 && [ -f "$HOME/.config/plasma-org.kde.plas
     fi
 fi
 
+# 设置页回写 cfg_ 必须只由用户操作触发：控件初始化时会先把自己置成默认项，
+# 用 onCurrentIndexChanged / onValueChanged 之类回写，那一下就把配置里的值冲成
+# 列表第一项（真踩过：浮层位置永远回到 bottom，背景设置直接从配置里消失）。
+# 排掉注释行：注释里正好会拿这条错误写法当反例。
+if grep -vE '^\s*//' panel/contents/ui/configGeneral.qml \
+        | grep -qE 'on(CurrentIndexChanged|ValueChanged|CheckedChanged)[^:]*:.*cfg_'; then
+    bad "设置页用了初始化也会触发的信号回写 cfg_，请改用 onActivated / onValueModified / onToggled"
+fi
+
 note "6. MoonBit"
 moon check --target native >/dev/null || bad "moon check 失败"
 
