@@ -111,6 +111,12 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
       println("letterswitch[界面] \{first_arg(ctx.body)}")
       string_reply("ok")
     }
+    // 界面推来的外观配置（`键=值;键=值`）。浮层读不到面板组件的配置，
+    // 所以经这里中转，随快照的 `@config=` 行发出去。
+    "Config" => {
+      session.set_config(first_arg(ctx.body))
+      string_reply("ok")
+    }
     // 取走待激活的窗口。界面选完之后触发 KWin 的「提交」动作，KWin 再来调这个。
     "TakePending" =>
       match session.take_pending() {

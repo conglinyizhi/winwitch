@@ -41,10 +41,16 @@ Window {
     readonly property int cardPadding: Kirigami.Units.smallSpacing * 2
 
     // 每行最多放几张卡片，避免宽屏上排成一条长龙。
-    readonly property int maxColumns: Math.max(1, Math.min(6,
+    readonly property int maxColumns: Math.max(1, Math.min(
+        Math.min(overlay.maxColumnsSetting, 8),
         Math.floor((screen.width * 0.7) / (cardWidth + cardSpacing))))
     readonly property int columns: Math.max(1, Math.min(maxColumns, rows.length))
     readonly property int gridWidth: columns * cardWidth + (columns - 1) * cardSpacing
+
+    // 外观配置，由面板组件经 helper 中转（快照里的 @config 行）。
+    property string positionSetting: "bottom"
+    property int maxColumnsSetting: 6
+    property bool showWindowTitle: true
 
     property int pollFailures: 0
     property bool useGdbus: false
@@ -54,9 +60,17 @@ Window {
     width: gridWidth + cardPadding * 2
     height: grid.implicitHeight + cardPadding * 2
 
-    // 默认放在当前屏幕底部中间（任务栏上方）。要换位置改这两行即可。
+    // 位置由设置决定（bottom / center / top）。
     x: Math.round((screen.width - width) / 2)
-    y: Math.round(screen.height - height - Kirigami.Units.gridUnit * 4)
+    y: {
+        if (overlay.positionSetting === "center") {
+            return Math.round((screen.height - height) / 2);
+        }
+        if (overlay.positionSetting === "top") {
+            return Math.round(Kirigami.Units.gridUnit * 4);
+        }
+        return Math.round(screen.height - height - Kirigami.Units.gridUnit * 4);
+    }
 
     // 进入选择模式时抢焦点收键盘；退出时窗口隐藏，焦点自然还回去。
     onSelectingChanged: {
@@ -151,9 +165,14 @@ Window {
                 }
             }
 
-            // 明细行：字母、应用名、图标名、窗口标题
+            // 明细行：字母、应用名、图标名、窗口标题。
+            // 另有一行 @config=... 承载外观配置，不是窗口。
             var parsed = [];
             for (var j = 1; j < lines.length; j++) {
+                if (lines[j].indexOf("@config=") === 0) {
+                    overlay.applyConfig(lines[j].substring("@config=".length));
+                    continue;
+                }
                 var row = lines[j].split("\t");
                 if (row.length >= 1 && row[0] !== "") {
                     parsed.push({
@@ -202,6 +221,29 @@ Window {
         }
         if (overlay.pollFailures >= 20) {
             overlay.pollFailures = 0;
+        }
+    }
+
+    // 解析 `键=值;键=值` 形式的外观配置。
+    function applyConfig(text) {
+        var parts = String(text).split(";");
+        for (var i = 0; i < parts.length; i++) {
+            var eq = parts[i].indexOf("=");
+            if (eq <= 0) {
+                continue;
+            }
+            var key = parts[i].substring(0, eq);
+            var value = parts[i].substring(eq + 1);
+            if (key === "position") {
+                overlay.positionSetting = value;
+            } else if (key === "columns") {
+                var n = parseInt(value, 10);
+                if (!isNaN(n) && n >= 1) {
+                    overlay.maxColumnsSetting = n;
+                }
+            } else if (key === "showTitle") {
+                overlay.showWindowTitle = (value === "1");
+            }
         }
     }
 
@@ -410,7 +452,7 @@ Window {
                             // 小标题：窗口标题，用来区分同一应用的多个窗口
                             Text {
                                 width: parent.width
-                                visible: text !== ""
+                                visible: overlay.showWindowTitle && text !== ""
                                 text: (card.modelData.appName !== ""
                                        && card.modelData.appName !== card.modelData.title)
                                       ? card.modelData.title : ""

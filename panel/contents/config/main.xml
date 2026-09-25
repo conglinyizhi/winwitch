@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <!-- 浮层位置：bottom / center / top -->
+        <entry name="overlayPosition" type="String">
+            <default>bottom</default>
+        </entry>
+        <!-- 卡片最多排几列 -->
+        <entry name="maxColumns" type="Int">
+            <default>6</default>
+            <min>1</min>
+            <max>8</max>
+        </entry>
+        <!-- 是否显示窗口标题（小标题那一行） -->
+        <entry name="showWindowTitle" type="Bool">
+            <default>true</default>
+        </entry>
+    </group>
+</kcfg>

@@ -33,11 +33,12 @@ pub(all) struct Session {
   mut tasks : Array[TaskMeta]
   mut slots : Array[Slot]
   mut pending : String
+  mut config : String
 }
 
 ///|
 pub fn Session::new() -> Session {
-  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], slots: [], pending: "" }
+  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], slots: [], pending: "", config: "" }
 }
 
 ///|
@@ -272,6 +273,15 @@ pub fn Session::handle_key(
 }
 
 ///|
+/// 记住界面推来的配置串（`键=值;键=值`）。
+///
+/// 配置在面板组件那一侧，而浮层是独立进程读不到，所以借 helper 中转：
+/// 顺序源把配置推过来，快照末尾以 `@config=` 行带出去。
+pub fn Session::set_config(self : Session, text : String) -> Unit {
+  self.config = sanitize_field(text, max_len=200)
+}
+
+///|
 /// 取走待激活的窗口（取完即清）。KWin 只负责「取回来并激活」。
 pub fn Session::take_pending(self : Session) -> String? {
   if self.pending == "" {
@@ -326,9 +336,14 @@ pub fn Session::encode(self : Session) -> String {
 /// `字母\ttitle\tapp_id`。界面只需一次查询就能把字母与窗口对应起来。
 pub fn Session::snapshot(self : Session) -> String {
   let head = self.encode()
-  if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
+  let with_config = if self.config == "" {
     head
   } else {
-    head + "\n" + encode_detail_full(self.labels, self.tasks, self.slots)
+    head + "\n@config=" + self.config
+  }
+  if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
+    with_config
+  } else {
+    with_config + "\n" + encode_detail_full(self.labels, self.tasks, self.slots)
   }
 }

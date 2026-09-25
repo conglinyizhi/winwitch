@@ -1,5 +1,6 @@
 import QtQuick
 import org.kde.plasma.plasmoid
+import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.taskmanager as TaskManager
 
@@ -393,6 +394,38 @@ PlasmoidItem {
         return { lines: lines, rows: rows };
     }
 
+    // 把外观配置推给 helper（浮层读不到面板组件的配置，只能这样绕一道）。
+    function pushConfig() {
+        var position = "bottom";
+        var columns = 6;
+        var showTitle = true;
+        try {
+            position = String(plasmoid.configuration.overlayPosition);
+            columns = Number(plasmoid.configuration.maxColumns);
+            showTitle = Boolean(plasmoid.configuration.showWindowTitle);
+        } catch (e) {
+            // 配置没读到就用默认值，不影响主流程
+        }
+        var text = "position=" + position
+                 + ";columns=" + columns
+                 + ";showTitle=" + (showTitle ? "1" : "0");
+        // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
+        // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
+        configSource.connectSource("qdbus6 org.clyzhi.LetterSwitch /LetterSwitch "
+                                   + "org.clyzhi.LetterSwitch.Config " + root.shellQuote(text));
+    }
+
+    P5Support.DataSource {
+        id: configSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName) {
+            configSource.disconnectSource(sourceName);
+        }
+    }
+
     // 每次都推，不做「内容没变就跳过」的去重。
     // 踩过的坑：helper 重启后之前推过的顺序就丢了，而面板以为自己推过了，
     // 于是永远不再推，字母静默退回 KWin 顺序（与任务栏对不上）。
@@ -436,7 +469,10 @@ PlasmoidItem {
         interval: 1000
         running: true
         repeat: true
-        onTriggered: root.pushOrder()
+        onTriggered: {
+            root.pushOrder();
+            root.pushConfig();
+        }
     }
 
     // 固定应用列表会变（用户拖进拖出），定期重读。
@@ -450,11 +486,30 @@ PlasmoidItem {
     Component.onCompleted: {
         root.fetchLaunchers();
         root.pushOrder();
+        root.pushConfig();
     }
 
-    compactRepresentation: Item {
-        implicitWidth: 0
-        implicitHeight: 0
+    // 面板上的入口：一个小而淡的图标，点它直接弹出设置。
+    // 本组件本身不显示状态，它只是「顺序源 + 设置入口」。
+    compactRepresentation: Kirigami.Icon {
+        source: "preferences-system-windows"
+        opacity: hoverArea.containsMouse ? 0.9 : 0.45
+        implicitWidth: Kirigami.Units.iconSizes.small
+        implicitHeight: Kirigami.Units.iconSizes.small
+
+        MouseArea {
+            id: hoverArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                var action = plasmoid.internalAction("configure");
+                if (action) {
+                    action.trigger();
+                }
+            }
+        }
     }
 
     fullRepresentation: compactRepresentation

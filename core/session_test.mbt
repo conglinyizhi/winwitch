@@ -292,3 +292,21 @@ test "分组图标里的多个窗口连续占字母" {
   assert_eq(labels[1].window_id, "w2")
   assert_eq(labels[2].window_id, "w3")
 }
+
+///|
+test "配置串随快照带出" {
+  let session = @core.Session::new()
+  ignore(session.begin(["w1"]))
+  session.set_config("position=top;columns=3;showTitle=0")
+  assert_eq(
+    session.snapshot(),
+    "selecting:t1:A=w1\n@config=position=top;columns=3;showTitle=0",
+  )
+}
+
+///|
+test "没有配置时不出现 @config 行" {
+  let session = @core.Session::new()
+  ignore(session.begin(["w1"]))
+  assert_eq(session.snapshot(), "selecting:t1:A=w1")
+}
