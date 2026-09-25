@@ -14,6 +14,12 @@ var SERVICE = "org.clyzhi.LetterSwitch";
 var PATH = "/LetterSwitch";
 var IFACE = "org.clyzhi.LetterSwitch";
 
+// 前缀常量：不要在用的时候现取长度。曾经把 length 当函数调用，
+// 一调就抛 TypeError，而 callDBus 回调里的异常会被静默吞掉，
+// 外部只看到「按了没反应」。
+var ACTIVATE_PREFIX = "activate:";
+var ERROR_PREFIX = "error";
+
 // 与 core 中的 default_alphabet 保持一致：主行 → 上排 → 下排。
 var ALPHABET = "ASDFGHJKLQWERTYUIOPZXCVBNM";
 
@@ -59,6 +65,10 @@ function windowIdOf(win) {
     return String(win.internalId);
 }
 
+function windowTitleOf(win) {
+    return win && win.caption ? String(win.caption) : "";
+}
+
 // Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
 // 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
 function beginSelection() {
@@ -70,7 +80,7 @@ function beginSelection() {
     callDBus(SERVICE, PATH, IFACE, "Begin", ids.join("\t"), function (reply) {
         var text = reply ? String(reply) : "";
         var parts = text.split("\t");
-        if (parts.length === 0 || parts[0] === "" || parts[0].indexOf("error") === 0) {
+        if (parts.length === 0 || parts[0] === "" || parts[0].indexOf(ERROR_PREFIX) === 0) {
             sessionToken = "";
             print("letterswitch: 进入选择模式失败，reply=" + text);
             return;
@@ -97,7 +107,14 @@ function activateWindowById(id) {
     var windows = switchableWindows();
     for (var i = 0; i < windows.length; i++) {
         if (windowIdOf(windows[i]) === id) {
-            workspace.activeWindow = windows[i];
+            try {
+                var title = windowTitleOf(windows[i]);
+                print("letterswitch: 准备激活 " + title + " (" + id + ")");
+                workspace.activeWindow = windows[i];
+                print("letterswitch: 已激活 " + title);
+            } catch (e) {
+                print("letterswitch: 激活抛错 " + e);
+            }
             return true;
         }
     }
@@ -106,18 +123,37 @@ function activateWindowById(id) {
 }
 
 // 单个字母：交给 helper 判定。Esc 的优先级、陈旧 token、超时都在那边。
+//
+// 激活过程全部包在 try/catch 里：callDBus 回调里抛出的异常会被静默吞掉，
+// 外部只能看到「按了没反应」。得自己把错误打出来。
 function handleLetter(letter) {
     if (sessionToken === "") {
         return;
     }
     var token = sessionToken;
     callDBus(SERVICE, PATH, IFACE, "Key", token + ":" + letter, function (reply) {
-        var text = reply ? String(reply) : "ignore";
-        if (text.indexOf("activate:") === 0) {
+        try {
+            var text = reply ? String(reply) : "ignore";
+            print("letterswitch: 按键 " + letter + " -> " + text);
+            if (text.indexOf(ACTIVATE_PREFIX) !== 0) {
+                sessionToken = "";
+                return;
+            }
+            var id = text.substring(ACTIVATE_PREFIX.length);
             sessionToken = "";
-            activateWindowById(text.substring("activate:".length()));
-        } else if (text === "cancel" || text === "timeout") {
-            sessionToken = "";
+            var windows = switchableWindows();
+            print("letterswitch: 候选窗口 " + windows.length + " 个，查找 " + id);
+            for (var i = 0; i < windows.length; i++) {
+                if (windowIdOf(windows[i]) === id) {
+                    print("letterswitch: 命中下标 " + i + "，标题 " + windowTitleOf(windows[i]));
+                    workspace.activeWindow = windows[i];
+                    print("letterswitch: 已激活");
+                    return;
+                }
+            }
+            print("letterswitch: 未找到目标窗口 " + id);
+        } catch (e) {
+            print("letterswitch: 激活流程抛错 " + e);
         }
     });
 }
