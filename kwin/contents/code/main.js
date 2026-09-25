@@ -31,10 +31,6 @@ var OVERLAY_TITLE = "WinWitch";
 
 // 选中之后由界面触发的那一个动作名。没有按键，只按名字触发。
 var COMMIT_SHORTCUT = "WinWitch 提交选择";
-// 调试入口：空按键，只能用 invokeShortcut 按名字触发。
-// 走这条路进选择模式时，浮层会置底、不抢焦点、右下角标「调试模式」，
-// 免得排障时糊在用户窗口上还抢走键盘。
-var DEBUG_SHORTCUT = "winwitch 调试预览";
 
 // 最近一次 Begin 拿到的 token。空表示当前没有会话；陈旧 token 由 helper 拒绝。
 var sessionToken = "";
@@ -98,13 +94,7 @@ function windowIdOf(win) {
 
 // Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
 // 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
-// 告诉 helper 现在是不是调试模式。浮层和这里都从配置串里读这个标记。
-function setDebug(on) {
-    callDBus(SERVICE, PATH, IFACE, "SetDebug", on ? "1" : "0", function () {});
-}
-
-function beginSelection(debug) {
-    setDebug(debug === true);
+function beginSelection() {
     var windows = switchableWindows();
     var lines = [];
     for (var i = 0; i < windows.length; i++) {
@@ -194,7 +184,6 @@ function placeOverlay(w) {
     callDBus(SERVICE, PATH, IFACE, "Settings", function (reply) {
         var text = reply ? String(reply) : "";
         var position = "bottom";
-        var debug = false;
         var parts = text.split(";");
         for (var i = 0; i < parts.length; i++) {
             var eq = parts[i].indexOf("=");
@@ -203,8 +192,6 @@ function placeOverlay(w) {
                 var value = parts[i].substring(eq + 1);
                 if (key === "position") {
                     position = value;
-                } else if (key === "debug") {
-                    debug = (value === "1");
                 }
             }
         }
@@ -223,6 +210,11 @@ function placeOverlay(w) {
         var frame = w.frameGeometry;
         var x = Math.round(geo.x + (geo.width - frame.width) / 2);
         var y = geo.y + overlayTargetY(position, geo.height, frame.height);
+        // 已经在对的位置就不动。这条是给「几何变化」信号用的，
+        // 否则设置 frameGeometry 会再触发信号，来回抖。
+        if (Math.abs(frame.x - x) <= 2 && Math.abs(frame.y - y) <= 2) {
+            return;
+        }
         try {
             // 这个 KWin 里：没有 Qt 对象（Qt.rect 用不了），x/y 是只读的。
             // 唯一可行的是给 frameGeometry 赋一个 JS 对象，marshalling 会转成 QRect。
@@ -232,24 +224,36 @@ function placeOverlay(w) {
             print("winwitch: 定位抛错 " + e2);
         }
 
-        // 每次都显式设置：浮层窗口是复用的，调试模式退出后必须把置底撤掉。
-        try {
-            w.keepBelow = debug;
-            print("winwitch: 浮层置底 " + (debug ? "开" : "关"));
-        } catch (e3) {
-            print("winwitch: 置底设置失败 " + e3);
-        }
     });
 }
 
-// 浮层在 Begin 之后才映射，所以被动等它出现比轮询可靠（这个 KWin 里没有定时器 API）。
+// 浮层窗口出现时摆一次。
+//
+// 每次唤醒浮层都会重新映射，所以这里每次都会跑到，不需要额外机制去催。
+//
+// 踩过的两个坑：
+//  1. 不要挂 frameGeometryChanged：窗口弹出时合成器在跑动画，几何每帧都在变，
+//     挂上去会被当成「位置不对」而每帧抢一次，和动画来回打架、日志被刷爆。
+//  2. 不要在浮层侧再喊一次「重新定位」：显示瞬间它还没被 KWin 认识，一定扑空，
+//     实测 windowAdded 这一条就够了。
+function watchOverlay(w) {
+    placeOverlay(w);
+}
+
 function hookOverlayPlacement() {
     try {
         workspace.windowAdded.connect(function (w) {
             if (w && windowTitleOf(w) === OVERLAY_TITLE) {
-                placeOverlay(w);
+                watchOverlay(w);
             }
         });
+        // 脚本重载时浮层进程可能还活着，已经存在的窗口也要先摆一次
+        var existing = workspace.windowList();
+        for (var i = 0; i < existing.length; i++) {
+            if (windowTitleOf(existing[i]) === OVERLAY_TITLE) {
+                watchOverlay(existing[i]);
+            }
+        }
         print("winwitch: 已挂上浮层定位");
     } catch (e) {
         print("winwitch: 挂浮层定位失败 " + e);
@@ -277,15 +281,6 @@ function init() {
 
     // 浮层在 Begin 之后才映射，用 windowAdded 被动等它出现
     hookOverlayPlacement();
-
-    registerShortcut(
-        DEBUG_SHORTCUT,
-        "调试预览：浮层置底、不抢焦点、标出「调试模式」",
-        "",
-        function () {
-            beginSelection(true);
-        }
-    );
 
     print("winwitch: 已注册，入口 " + prefix + "，提交动作无按键");
 }

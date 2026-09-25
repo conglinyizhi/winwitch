@@ -34,7 +34,6 @@ pub(all) struct Session {
   mut slots : Array[Slot]
   mut pending : String
   mut config : String
-  mut debug : Bool
 }
 
 ///|
@@ -48,7 +47,6 @@ pub fn Session::new() -> Session {
     slots: [],
     pending: "",
     config: "",
-    debug: false,
   }
 }
 
@@ -293,31 +291,9 @@ pub fn Session::set_config(self : Session, text : String) -> Unit {
 }
 
 ///|
-/// 开关调试模式。调试模式让浮层置底、不抢焦点、右下角标「调试模式」，
-/// 排障时不至于糊在用户窗口上。
-pub fn Session::set_debug(self : Session, value : Bool) -> Unit {
-  self.debug = value
-}
-
-///|
-/// 配置串 + 调试标记（只在打开时追加）。
-///
-/// 调试标记单独存：面板每秒钟都会推一次配置，混在配置串里会被冲掉。
-pub fn Session::config_text(self : Session) -> String {
-  if !self.debug {
-    return self.config
-  }
-  if self.config == "" {
-    "debug=1"
-  } else {
-    self.config + ";debug=1"
-  }
-}
-
-///|
 /// 读回当前配置串。
 pub fn Session::settings(self : Session) -> String {
-  self.config_text()
+  self.config
 }
 
 ///|
@@ -375,11 +351,10 @@ pub fn Session::encode(self : Session) -> String {
 /// `字母\ttitle\tapp_id`。界面只需一次查询就能把字母与窗口对应起来。
 pub fn Session::snapshot(self : Session) -> String {
   let head = self.encode()
-  let config_text = self.config_text()
-  let with_config = if config_text == "" {
+  let with_config = if self.config == "" {
     head
   } else {
-    head + "\n@config=" + config_text
+    head + "\n@config=" + self.config
   }
   if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
     with_config

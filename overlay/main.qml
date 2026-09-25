@@ -53,8 +53,6 @@ Window {
     property bool showWindowTitle: true
     // 背景风格：translucent=半透明 / opaque=完全不透明
     property string backgroundStyle: "translucent"
-    // 调试模式：置底、不抢焦点、右下角标「调试模式」（KWin 的调试入口开的）
-    property bool debugMode: false
 
     readonly property bool styleOpaque: overlay.backgroundStyle === "opaque"
     // 半透明的 alpha 特意压到 0.75：原来 0.94 与「完全不透明」的 1.0 肉眼几乎没差别，
@@ -84,13 +82,13 @@ Window {
     }
 
     // 进入选择模式时抢焦点收键盘；退出时窗口隐藏，焦点自然还回去。
-    // 调试模式不抢：那是排障用的浮层，不该把键盘从用户手里夺走。
     onSelectingChanged: {
-        if (overlay.selecting && !overlay.debugMode) {
+        if (overlay.selecting) {
             overlay.requestActivate();
             keyCatcher.forceActiveFocus();
         }
     }
+
 
     // 图标名归一化：绝对路径要当文件 URL 处理。
     function iconSource(name) {
@@ -167,6 +165,7 @@ Window {
             } else {
                 overlay.token = rest;
             }
+
 
             var letters = [];
             var parts = assignment.split("\t");
@@ -257,8 +256,6 @@ Window {
                 overlay.showWindowTitle = (value === "1");
             } else if (key === "bg") {
                 overlay.backgroundStyle = (value === "opaque") ? "opaque" : "translucent";
-            } else if (key === "debug") {
-                overlay.debugMode = (value === "1");
             }
         }
     }
@@ -488,27 +485,6 @@ Window {
                     }
                 }
             }
-        }
-    }
-
-    // 调试模式角标：提醒这个浮层是排障用的，不是正常界面。
-    Rectangle {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: Kirigami.Units.smallSpacing
-        width: debugLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
-        height: debugLabel.implicitHeight + Kirigami.Units.smallSpacing
-        radius: 3
-        color: Qt.rgba(0.45, 0.12, 0.12, 0.85)
-        visible: overlay.debugMode
-
-        Text {
-            id: debugLabel
-
-            anchors.centerIn: parent
-            text: "调试模式"
-            color: "#ffffff"
-            font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.8)
         }
     }
 }

@@ -57,6 +57,10 @@ uninstall: ## 卸载
 	@bash $(REPO)/scripts/uninstall.sh
 
 .PHONY: cancel
+flash: ## 闪测：唤醒一次浮层，1.2 秒后自动收掉（换时长：make flash SEC=3）
+	@bash $(REPO)/scripts/flash.sh $(SEC)
+
+.PHONY: flash
 cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
 	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
 		io.github.conglinyizhi.winwitch.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \

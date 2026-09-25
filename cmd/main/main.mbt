@@ -120,14 +120,6 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     // 读回当前配置。KWin 需要知道浮层该贴哪条边（Wayland 下客户端设的窗口坐标会被忽略，
     // 只能由 KWin 来摆位置）。
     "Settings" => string_reply(session.settings())
-    // KWin 的调试入口开/关调试模式（`1`/`0`）。用字符串而不是布尔，
-    // 这样和其余方法共用 first_arg 的参数读取，少一处签名猜测。
-    // 调试模式 = 浮层置底 + 不抢焦点 + 右下角标「调试模式」。
-    "SetDebug" => {
-      let value = first_arg(ctx.body)
-      session.set_debug(value != "" && value != "0")
-      string_reply("ok")
-    }
     // 取走待激活的窗口。界面选完之后触发 KWin 的「提交」动作，KWin 再来调这个。
     "TakePending" =>
       match session.take_pending() {
