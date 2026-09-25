@@ -1,13 +1,22 @@
 # 字母切窗 (Letter Switch)
 
-KDE Plasma 6 / Wayland 下的窗口切换器。按 `Meta+F` 进入选择模式，任务栏图标右上角显示
-字母标签，按字母切到对应窗口，`Esc` 立即退出且不切换任何窗口。
+KDE Plasma 6 / Wayland 下的窗口切换器。按 `Meta+F` 进入选择模式，面板上的字母条显示
+当前可用的字母，按字母切到对应窗口，`Esc` 立即退出且不切换任何窗口。
 
 ```
-Meta+F              进入选择模式，显示标签
+Meta+F              进入选择模式，面板字母条显示可用字母
 Meta+F, <字母>       切到该字母对应的窗口
 Meta+F, Escape      取消，不切换窗口
 ```
+
+## 标签显示形态
+
+两个形态，当前部署的是第二个：
+
+- **替代任务栏**：字母直接画在任务栏图标右上角，所见即所得。需要用一个精简版任务栏
+  换掉系统任务栏，会丢掉分组、悬停预览等行为。
+- **字母条（当前）**：面板上一个窄组件，只展示当前可用的字母，点字母也能切窗。
+  不动任务栏，代价是**看不出字母对应哪个窗口**。
 
 ## 为什么是这三个部分
 
@@ -18,10 +27,9 @@ Plasma 6 Wayland 下，「进入模式后吃掉下一个任意按键」不能只
 | --- | --- | --- |
 | 状态机与协议 | `core/`（MoonBit） | 字母分配、`Esc` 优先级、会话 token、超时 |
 | 会话服务 | `cmd/main/`（MoonBit + moondbus） | 把状态机以 D-Bus 服务暴露给 KWin 和 Plasma |
-| 窗口与显示 | `kwin/`、`package/` | KWin 枚举/激活窗口；QML 画标签 |
+| 窗口与显示 | `kwin/`、`package/` | KWin 枚举/激活窗口；QML 画字母条 |
 
-MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两侧通过 D-Bus 交换字符串，
-不比较窗口 ID 的跨进程一致性：任务栏按自己的顺序算标签，KWin 按同一顺序激活。
+MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两侧通过 D-Bus 交换字符串。
 
 ## 安装
 
@@ -29,7 +37,7 @@ MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两�
 scripts/install.sh
 ```
 
-脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本与任务栏组件，
+脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本与字母条组件，
 写自启动项。之后还需手动完成：
 
 1. 手动跑一次 helper：
@@ -41,7 +49,7 @@ scripts/install.sh
    `stdbuf -oL` 不能省：MoonBit 的 stdout 在重定向到文件时是全缓冲，不加就看不到任何日志。
 
 2. 系统设置 → 窗口管理 → KWin 脚本，确认「字母切窗」已勾选。
-3. 面板添加「字母切窗标签」组件。
+3. 面板添加「字母切窗 字母条」组件。
 
 自检：
 
@@ -83,13 +91,22 @@ scripts/uninstall.sh
 - **Meta+F 处理器全链路跑通**：主动触发「字母切窗 进入选择模式」后，KWin 枚举出真实会话的 12 个窗口，
   helper 按顺序分配 `A S D F G H J K L Q W E R`，`Status` 返回 `selecting:t7:...`；再触发取消回到 `idle:t8`。
 - **三种 D-Bus 客户端都能稳定调用**：gdbus、busctl、qdbus6 各三轮均返回；连轮询 30 次无超时、无残留进程。
+- **按 `Meta+F` 确实会触发**。journal 里能数到多次「选择模式开始 token=t…」与随之的「已取消」，
+  对应实际按键；测试时也曾误判为「没反应」，实际是当时没有任何可见反馈。
+- **4 秒超时生效**：触发后不操作，状态会自动回到 `idle`。
+- **字母条已在面板上运行**：开调试日志后测到每 3 秒 12 次 `Status`，正好对应 250ms 轮询周期。
 
 ### 仍未验证
 
-1. **按实际的 `Meta+F, <字母>` 键序列能否触发**。快捷键已注册成功，但键序列是否被 KDE 真正派发，需你亲手按一下。
-   若无效，把 `kwin/contents/code/main.js` 里的 `useSequences` 默认值改 `false`，退到 `Meta+Alt+<字母>`。
-2. **按字母后的窗口激活那一段**。不偷你桌面焦点，所以没测；你按一次就知道。
-3. **任务栏组件在面板上的实际渲染**。包已正确安装，但尚未添加到面板。
+1. **按字母后的窗口激活那一段**。不偷你桌面焦点，所以没测；按一次就知道。
+2. **字母条的实际视觉效果**。终端里无法确认渲染，见下。
+
+## 本机部署状态
+
+- 仓库：`~/disk/ai_workspace/kde-winwitch`
+- helper：`~/.local/bin/letterswitch`，由 `~/.config/autostart/letterswitch-helper.desktop` 自启
+- KWin 脚本：已启用（`kwinrc` 的 `letterswitchEnabled=true`）
+- 字母条：已添加到面板末尾（applet id 36，用右键 → 移除即可拆下）
 
 ## 排查笔记
 
@@ -102,14 +119,15 @@ scripts/uninstall.sh
   KWin 会拒收并报 `does not match requested format "KWin/Script"`，而且坏 metadata 装上后
   `kpackagetool6 --upgrade` 也认不出这个包，安装脚本因此改成先移除再安装。
 
-helper 的逐调用日志默认关闭（任务栏会持续轮询，打开会刷满日志）：
+helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会刷满日志）：
 排障时用 `LETTERSWITCH_DEBUG=1 letterswitch` 启动。
 
 ## 已知限制
 
-- 字母上限 26 个窗口，超出的窗口不显示标签。
-- 任务栏组件是独立实现，不是系统任务栏的补丁；它不会修改 `/usr/share` 下的任何文件，
-  但也不会把标签叠加到系统任务栏上，需要用它替代原任务栏。
+- 字母上限 26 个窗口，多余的窗口没有字母。
+- 字母条只显示字母，不显示字母对应哪个窗口：KWin 枚举窗口的顺序与任务栏模型的手工排序
+  未必一致，硬对应会显示错误映射。要所见即所得，需要用「替代任务栏」那个形态。
+- 字母条会在面板上占一小格位置；不需要时右键移除。
 - helper 必须常驻；未运行时标签不显示（隐藏是安全的默认值），`Meta+F` 不会生效。
 - 未实现：多屏分组、按应用分组、虚拟桌面跨屏切换、标签颜色配置。
 
@@ -128,7 +146,7 @@ moon info
 core/           纯逻辑：标签分配 + 会话状态机（无外部依赖，任何后端可测）
 cmd/main/       D-Bus 会话服务
 kwin/           KWin 脚本包
-package/        Plasma 任务栏组件包
+package/        Plasma 字母条组件包
 data/           自启动项
 scripts/        安装与卸载
 ```

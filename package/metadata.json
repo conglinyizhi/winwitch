@@ -1,11 +1,12 @@
 {
+    "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Name": "字母切窗标签 (Letter Switch Labels)",
-        "Description": "在任务栏图标右上角显示当前选择模式下的字母标签。",
+        "Name": "字母切窗 字母条 (Letter Switch Strip)",
+        "Description": "显示字母切窗当前可用的字母，点击即可切换窗口。",
         "Icon": "preferences-system-windows",
         "Id": "org.clyzhi.letterswitch.labels",
-        "Version": "0.1.0",
         "License": "GPL-3.0-or-later",
+        "Version": "0.1.0",
         "Category": "Windows and Tasks",
         "Authors": [
             {
@@ -13,7 +14,6 @@
             }
         ]
     },
-    "KPackageStructure": "Plasma/Applet",
     "X-Plasma-API-Minimum-Version": "6.0",
     "X-Plasma-Provides": [
         "org.kde.plasma.multitasking"
