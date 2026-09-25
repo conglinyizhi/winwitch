@@ -1,0 +1,62 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "clyzhi/letterswitch/core"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn assign_labels(Array[String], alphabet? : String) -> Array[Label]
+
+pub fn decode_labels(String) -> Array[Label]
+
+pub let default_alphabet : String
+
+pub fn encode_labels(Array[Label]) -> String
+
+pub fn lookup_label(Array[Label], String) -> String?
+
+pub fn split_char(String, Char) -> Array[String]
+
+pub fn split_once(String, Char) -> (String, String)?
+
+// Errors
+
+// Types and methods
+pub(all) enum Action {
+  Activate(String)
+  Cancel
+  Timeout
+  Ignore
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Label {
+  letter : String
+  window_id : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Phase {
+  Idle
+  Selecting
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Session {
+  mut phase : Phase
+  mut token : String
+  mut next_token : Int
+  mut labels : Array[Label]
+}
+pub fn Session::begin(Self, Array[String], alphabet? : String) -> Array[Label]
+pub fn Session::clear(Self) -> Unit
+pub fn Session::encode(Self) -> String
+pub fn Session::handle_cancel(Self, String) -> Action
+pub fn Session::handle_key(Self, String, String) -> Action
+pub fn Session::handle_timeout(Self, String) -> Action
+pub fn Session::is_selecting(Self) -> Bool
+pub fn Session::labels(Self) -> Array[Label]
+pub fn Session::new() -> Self
+pub fn Session::token(Self) -> String
+
+// Type aliases
+
+// Traits

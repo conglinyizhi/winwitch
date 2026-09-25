@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Name": "字母切窗 (Letter Switch)",
+        "Description": "按 Meta+F 后，用单个字母切换到对应窗口；Esc 立即取消。",
+        "Version": "0.1.0",
+        "License": "GPL-3.0-or-later",
+        "Id": "letterswitch",
+        "Authors": [
+            {
+                "Name": "clyzhi"
+            }
+        ]
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js",
+    "KPlugin.ServiceTypes": [
+        "KWin/Script"
+    ]
+}

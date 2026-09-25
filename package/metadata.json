@@ -1,0 +1,21 @@
+{
+    "KPlugin": {
+        "Name": "字母切窗标签 (Letter Switch Labels)",
+        "Description": "在任务栏图标右上角显示当前选择模式下的字母标签。",
+        "Icon": "preferences-system-windows",
+        "Id": "org.clyzhi.letterswitch.labels",
+        "Version": "0.1.0",
+        "License": "GPL-3.0-or-later",
+        "Category": "Windows and Tasks",
+        "Authors": [
+            {
+                "Name": "clyzhi"
+            }
+        ]
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multitasking"
+    ]
+}

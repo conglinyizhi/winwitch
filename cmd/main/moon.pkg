@@ -1,0 +1,8 @@
+import {
+  "clyzhi/letterswitch/core",
+  "conglinyizhi/moondbus/src" @dbus,
+}
+
+supported_targets = "+native"
+
+pkgtype(kind: "executable")
