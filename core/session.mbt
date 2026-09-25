@@ -32,11 +32,12 @@ pub(all) struct Session {
   mut labels : Array[Label]
   mut tasks : Array[TaskMeta]
   mut slots : Array[Slot]
+  mut pending : String
 }
 
 ///|
 pub fn Session::new() -> Session {
-  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], slots: [] }
+  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], slots: [], pending: "" }
 }
 
 ///|
@@ -259,10 +260,26 @@ pub fn Session::handle_key(
   }
   match lookup_label(self.labels, key) {
     Some(wid) => {
+      // 记下待激活的窗口：本轮选择可能是界面点的，也可能是键盘按的。
+      // 浮层不能直接激活窗口（KWin 也没暴露按 UUID 激活的接口），
+      // 所以要留在这里等 KWin 来取。
+      self.pending = wid
       self.clear()
       Activate(wid)
     }
     None => Ignore
+  }
+}
+
+///|
+/// 取走待激活的窗口（取完即清）。KWin 只负责「取回来并激活」。
+pub fn Session::take_pending(self : Session) -> String? {
+  if self.pending == "" {
+    None
+  } else {
+    let id = self.pending
+    self.pending = ""
+    Some(id)
   }
 }
 

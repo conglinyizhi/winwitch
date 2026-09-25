@@ -37,6 +37,10 @@ kwriteconfig6 --file kwinrc --group Plugins --key letterswitchEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 2
 
+# 清掉废弃的快捷键条目（26 个字母序列 + 取消）。它们从来没生效过，
+# 还会让 Plasma 报「Meta+F 遮蔽了以下全局操作」。
+bash "$repo/scripts/clean-shortcuts.sh" || true
+
 say "2.5/6 确保面板顺序源就位"
 kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.order >/dev/null 2>&1 || true
 rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.order"

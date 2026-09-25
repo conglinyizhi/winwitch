@@ -111,6 +111,12 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
       println("letterswitch[界面] \{first_arg(ctx.body)}")
       string_reply("ok")
     }
+    // 取走待激活的窗口。界面选完之后触发 KWin 的「提交」动作，KWin 再来调这个。
+    "TakePending" =>
+      match session.take_pending() {
+        Some(id) => string_reply("activate:" + id)
+        None => string_reply("none")
+      }
     // 面板组件报来的任务栏槽位（每行 `<窗口 ID 逗号分隔>\t应用名\t图标名\t标题`）。
     // KWin 的枚举顺序与任务栏不一致，靠这个把字母对齐到图标位置；
     // 启动器行没有窗口但占一个字母位，否则后面的字母会与图标错开。

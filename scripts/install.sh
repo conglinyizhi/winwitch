@@ -68,6 +68,10 @@ sed "s|@WRAPPER@|$bin_dir/letterswitch-overlay|" \
 chmod 644 "$autostart_dir/letterswitch-overlay.desktop"
 echo "已安装浮层：$data_dir/overlay/main.qml"
 
+# 清掉废弃的快捷键条目（26 个字母序列 + 取消）。它们从来没生效过，
+# 还会让 Plasma 报「Meta+F 遮蔽了以下全局操作」。
+bash "$repo/scripts/clean-shortcuts.sh" || true
+
 say "5/5 安装面板顺序源"
 kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.labels >/dev/null 2>&1 || true
 kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.probe >/dev/null 2>&1 || true

@@ -209,11 +209,39 @@ Window {
         commandSource.connectSource(overlay.statusCommand());
     }
 
-    // 点卡片等于触发对应的 KWin 快捷键，激活逻辑只留在 KWin 那一侧。
+    // 选中一个字母（键盘按键或点击卡片都走这里）。
+    //
+    // 浮层自己不能激活窗口：KWin 没有暴露「按 UUID 激活」的 D-Bus 接口。
+    // 所以分两步：先把选择写进 helper，再触发 KWin 那个无按键的「提交」动作，
+    // 由 KWin 把窗口取回来激活。
     function activateLetter(letter) {
+        var t = overlay.token;
+        if (t === "") {
+            return;
+        }
+        chooseSource.connectSource("qdbus6 " + overlay.serviceName + " "
+                                   + overlay.objectPath + " " + overlay.interfaceName
+                                   + ".Key " + t + ":" + letter);
+    }
+
+    // 第二步：让 KWin 去取（这个动作没有按键，因此不占用也不会遮蔽任何组合键）。
+    function commitSelection() {
         actionSource.connectSource(
             "qdbus6 org.kde.kglobalaccel /component/kwin "
-            + "org.kde.kglobalaccel.Component.invokeShortcut \"字母切窗 " + letter + "\"");
+            + "org.kde.kglobalaccel.Component.invokeShortcut \"字母切窗 提交选择\"");
+    }
+
+    P5Support.DataSource {
+        id: chooseSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName) {
+            chooseSource.disconnectSource(sourceName);
+            // 选择已经写进 helper，接着让 KWin 取走
+            overlay.commitSelection();
+        }
     }
 
     P5Support.DataSource {

@@ -1,27 +1,36 @@
 // 字母切窗 · KWin 侧
 //
 // 职责边界（刻意保持很薄）：
-//   - 注册入口快捷键与每个字母的后续快捷键；
+//   - 注册入口快捷键；
 //   - 枚举可切换窗口；
-//   - 调用 MoonBit helper（D-Bus）得到决定；
-//   - 激活 helper 指定的窗口。
+//   - 取出「界面已经选好的窗口」并激活它。
 //
-// 决策（字母分配、Esc 优先级、会话 token、超时）全在 MoonBit 与界面侧，
-// 这里**不保存**「是否正在选择」这类状态。早期版本存过，结果界面侧看门狗
-// 取消之后本地标志与 helper 不一致，再按 Meta+F 会变成取消而不是开始。
+// 决策（字母分配、Esc、会话 token）全在 MoonBit 与浮层侧。
+//
+// 两个踩出来的限制，决定了这里的写法：
+//   1. KWin 脚本里**没有** callLater / setTimeout（实测 `probe callLater 不存在`），
+//      所以这里做不了定时轮询，只能被动响应；
+//   2. KGlobalAccel **不派发两段式序列的第二段**，所以 `Meta+F, A` 这种注册没有意义，
+//      而且会让 Plasma 报「Meta+F 遮蔽了这些操作」。
+//
+// 因此：只注册 `Meta+F`，另加**一个没有按键的快捷键**用于提交。
+// 空序列不占用任何组合键，只能按名字触发，因此不会遮蔽任何东西。
 
 var SERVICE = "org.clyzhi.LetterSwitch";
 var PATH = "/LetterSwitch";
 var IFACE = "org.clyzhi.LetterSwitch";
 
-// 前缀常量：不要在用的时候现取长度。曾经把 length 当函数调用，
-// 一调就抛 TypeError，而 callDBus 回调里的异常会被静默吞掉，
-// 外部只看到「按了没反应」。
+// 前缀常量：length 是属性不是函数，别在用的时候现取（踩过两次）。
 var ACTIVATE_PREFIX = "activate:";
 var ERROR_PREFIX = "error";
 
-// 与 core 中的 default_alphabet 保持一致：主行 → 上排 → 下排。
-var ALPHABET = "ASDFGHJKLQWERTYUIOPZXCVBNM";
+// 浮层自己的窗口标题，绝不能当成可切换目标。
+// 窗口类型设了 Qt.Tool，但 Wayland 下 KWin 仍会把它算进窗口列表，
+// 结果浮层自己占一个字母（用户实测发现过）。
+var OVERLAY_TITLE = "字母切窗";
+
+// 选中之后由界面触发的那一个动作名。没有按键，只按名字触发。
+var COMMIT_SHORTCUT = "字母切窗 提交选择";
 
 // 最近一次 Begin 拿到的 token。空表示当前没有会话；陈旧 token 由 helper 拒绝。
 var sessionToken = "";
@@ -38,12 +47,22 @@ function readConfigString(key, fallback) {
     }
 }
 
-// 浮层自己的窗口标题，绝不能当成可切换目标。
-// 窗口类型设了 Qt.Tool，但 Wayland 下 KWin 仍会把它算进窗口列表，
-// 结果浮层自己占一个字母（用户实测发现过）。
-var OVERLAY_TITLE = "字母切窗";
+function windowTitleOf(win) {
+    return win && win.caption ? String(win.caption) : "";
+}
 
-// 可切换窗口：普通窗口、不在任务栏隐藏、不跳过任务切换器。
+// 应用标识：用来在界面上取图标。Wayland 上 resourceClass 是应用级标识。
+function windowAppIdOf(win) {
+    return win && win.resourceClass ? String(win.resourceClass) : "";
+}
+
+// 标题里可能有制表符或换行（行协议的分隔符），先清洗再拼装。
+function sanitizeField(text) {
+    var s = text === undefined || text === null ? "" : String(text);
+    return s.replace(/[\t\n\r]/g, " ").substring(0, 60);
+}
+
+// 可切换窗口：普通窗口、不在任务栏隐藏、不跳过任务切换器、不是浮层自己。
 function switchableWindows() {
     var result = [];
     var windows = workspace.windowList ? workspace.windowList() : workspace.clientList();
@@ -73,21 +92,6 @@ function windowIdOf(win) {
     return String(win.internalId);
 }
 
-function windowTitleOf(win) {
-    return win && win.caption ? String(win.caption) : "";
-}
-
-// 应用标识：用来在界面上取图标。Wayland 上 resourceClass 是应用级标识。
-function windowAppIdOf(win) {
-    return win && win.resourceClass ? String(win.resourceClass) : "";
-}
-
-// 标题里可能有制表符或换行（行协议的分隔符），先清洗再拼装。
-function sanitizeField(text) {
-    var s = text === undefined || text === null ? "" : String(text);
-    return s.replace(/[\t\n\r]/g, " ").substring(0, 60);
-}
-
 // Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
 // 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
 function beginSelection() {
@@ -114,7 +118,7 @@ function beginSelection() {
     });
 }
 
-// 取消：不激活任何窗口。Esc 与界面侧看门狗都会走到这里。
+// 取消：不激活任何窗口。界面按 Esc、或点了取消，都会走到这里。
 function callCancel() {
     var token = sessionToken;
     sessionToken = "";
@@ -132,7 +136,6 @@ function activateWindowById(id) {
         if (windowIdOf(windows[i]) === id) {
             try {
                 var title = windowTitleOf(windows[i]);
-                print("letterswitch: 准备激活 " + title + " (" + id + ")");
                 workspace.activeWindow = windows[i];
                 print("letterswitch: 已激活 " + title);
             } catch (e) {
@@ -145,61 +148,24 @@ function activateWindowById(id) {
     return false;
 }
 
-// 单个字母：交给 helper 判定。Esc 的优先级、陈旧 token、超时都在那边。
+// 界面已经选好了字母（把选择写进了 helper），这里只需要把它取回来并激活。
 //
-// 激活过程全部包在 try/catch 里：callDBus 回调里抛出的异常会被静默吞掉，
-// 外部只能看到「按了没反应」。得自己把错误打出来。
-function handleLetter(letter) {
-    if (sessionToken === "") {
-        return;
-    }
-    var token = sessionToken;
-    callDBus(SERVICE, PATH, IFACE, "Key", token + ":" + letter, function (reply) {
-        try {
-            var text = reply ? String(reply) : "ignore";
-            print("letterswitch: 按键 " + letter + " -> " + text);
-            if (text.indexOf(ACTIVATE_PREFIX) !== 0) {
-                sessionToken = "";
-                return;
-            }
-            var id = text.substring(ACTIVATE_PREFIX.length);
-            sessionToken = "";
-            var windows = switchableWindows();
-            print("letterswitch: 候选窗口 " + windows.length + " 个，查找 " + id);
-            for (var i = 0; i < windows.length; i++) {
-                if (windowIdOf(windows[i]) === id) {
-                    print("letterswitch: 命中下标 " + i + "，标题 " + windowTitleOf(windows[i]));
-                    workspace.activeWindow = windows[i];
-                    print("letterswitch: 已激活");
-                    return;
-                }
-            }
-            print("letterswitch: 未找到目标窗口 " + id);
-        } catch (e) {
-            print("letterswitch: 激活流程抛错 " + e);
+// 浮层自己不能激活窗口（没有权限，KWin 也没暴露按 UUID 激活的 D-Bus 接口），
+// 所以只能由 KWin 来做这一步。界面在调用 Key 之后再触发本动作。
+function commitSelection() {
+    callDBus(SERVICE, PATH, IFACE, "TakePending", function (reply) {
+        var text = reply ? String(reply) : "none";
+        if (text.indexOf(ACTIVATE_PREFIX) !== 0) {
+            return;
         }
+        var id = text.substring(ACTIVATE_PREFIX.length);
+        sessionToken = "";
+        activateWindowById(id);
     });
-}
-
-function registerLetterShortcuts(prefix, useSequences) {
-    for (var i = 0; i < ALPHABET.length; i++) {
-        (function (letter) {
-            var sequence = useSequences ? (prefix + ", " + letter) : ("Meta+Alt+" + letter);
-            registerShortcut(
-                "字母切窗 " + letter,
-                "切换到标签为 " + letter + " 的窗口",
-                sequence,
-                function () {
-                    handleLetter(letter);
-                }
-            );
-        })(ALPHABET[i]);
-    }
 }
 
 function init() {
     var prefix = readConfigString("shortcutPrefix", "Meta+F");
-    var useSequences = readConfigString("useSequences", "true") !== "false";
 
     registerShortcut(
         "字母切窗 进入选择模式",
@@ -207,21 +173,20 @@ function init() {
         prefix,
         beginSelection
     );
+
+    // 空按键序列：不占用任何组合键，因此不会与 Meta+F 产生「遮蔽」告警，
+    // 也不会抢走任何用户可能用到的键。只能通过 invokeShortcut 按名字触发。
     registerShortcut(
-        "字母切窗 取消",
-        "取消选择模式，不切换窗口",
-        prefix + ", Escape",
-        callCancel
+        COMMIT_SHORTCUT,
+        "提交当前选中的字母（由浮层触发，无需手动按）",
+        "",
+        commitSelection
     );
 
-    registerLetterShortcuts(prefix, useSequences);
-
-    print("letterswitch: 已注册，入口 " + prefix +
-          (useSequences ? "（组合序列）" : "（Meta+Alt+字母 平铺）"));
+    print("letterswitch: 已注册，入口 " + prefix + "，提交动作无按键");
 }
 
-// 脚本重载或 KWin 退出时不留半开状态。超时由界面侧看门狗负责：
-// KWin 脚本里的 callLater 实测会漏触发，不能作为唯一保障。
+// 脚本重载或 KWin 退出时不留半开状态。
 function cleanup() {
     callCancel();
 }
