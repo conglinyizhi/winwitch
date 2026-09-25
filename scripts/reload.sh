@@ -8,10 +8,10 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
 
-bin="$HOME/.local/bin/windownavigator"
-overlay_bin="$HOME/.local/bin/windownavigator-overlay"
-data_dir="$HOME/.local/share/windownavigator"
-kwin_id="windownavigator"
+bin="$HOME/.local/bin/winwitch"
+overlay_bin="$HOME/.local/bin/winwitch-overlay"
+data_dir="$HOME/.local/share/winwitch"
+kwin_id="winwitch"
 
 say() { printf '\n=== %s ===\n' "$*"; }
 
@@ -30,10 +30,10 @@ kpackagetool6 --type KWin/Script --install "$repo/kwin" >/dev/null
 # reconfigure 不会重载已重装过的脚本，但也不能用 Scripting.unloadScript + loadScript：
 # 那样会留下僵尸动作（旧动作仍在 kglobalaccel，新实例同名注册被拒，触发没反应）。
 # 正确做法是开关一次插件，让 KWin 自己卸载旧实例、加载新实例。
-kwriteconfig6 --file kwinrc --group Plugins --key windownavigatorEnabled false
+kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled false
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 1
-kwriteconfig6 --file kwinrc --group Plugins --key windownavigatorEnabled true
+kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 2
 
@@ -42,8 +42,8 @@ sleep 2
 bash "$repo/scripts/clean-shortcuts.sh" || true
 
 say "2.5/6 确保面板顺序源就位"
-kpackagetool6 --type Plasma/Applet --remove io.github.conglinyizhi.windownavigator.panel >/dev/null 2>&1 || true
-rm -rf "$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.windownavigator.panel"
+kpackagetool6 --type Plasma/Applet --remove io.github.conglinyizhi.winwitch.panel >/dev/null 2>&1 || true
+rm -rf "$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel"
 kpackagetool6 --type Plasma/Applet --install "$repo/panel" >/dev/null
 # 重装后 QML 变了，plasmashell 会继续跑内存里的旧版本，必须重启一次并清缓存。
 rm -rf "$HOME/.cache/plasmashell/qmlcache"
@@ -56,47 +56,47 @@ say "3/6 更新浮层"
 mkdir -p "$data_dir/overlay"
 install -m 644 "$repo/overlay/main.qml" "$data_dir/overlay/main.qml"
 sed "s|@OVERLAY@|$data_dir/overlay/main.qml|" \
-    "$repo/overlay/windownavigator-overlay.sh" > "$overlay_bin"
+    "$repo/overlay/winwitch-overlay.sh" > "$overlay_bin"
 chmod 755 "$overlay_bin"
 
 say "4/6 重启 helper"
-pkill -x windownavigator 2>/dev/null || true
+pkill -x winwitch 2>/dev/null || true
 sleep 1
-: > /tmp/windownavigator.log
-setsid nohup stdbuf -oL "$bin" >/tmp/windownavigator.log 2>&1 </dev/null &
+: > /tmp/winwitch.log
+setsid nohup stdbuf -oL "$bin" >/tmp/winwitch.log 2>&1 </dev/null &
 sleep 2
-pgrep -x windownavigator >/dev/null && echo "helper 已启动" || {
+pgrep -x winwitch >/dev/null && echo "helper 已启动" || {
     echo "helper 启动失败，日志：" >&2
-    cat /tmp/windownavigator.log >&2
+    cat /tmp/winwitch.log >&2
     exit 1
 }
 
 say "5/6 重启浮层"
-# 实际进程是 `/usr/bin/qml .../windownavigator/overlay/main.qml`，不包含包装脚本的名字，
+# 实际进程是 `/usr/bin/qml .../winwitch/overlay/main.qml`，不包含包装脚本的名字，
 # 按包装脚本名 pkill 会匹配不到，于是每次重载都多留一个实例（会多个浮层叠在一起）。
-pkill -f 'windownavigator/overlay/main.qml' 2>/dev/null || true
+pkill -f 'winwitch/overlay/main.qml' 2>/dev/null || true
 sleep 1
 setsid nohup "$overlay_bin" >/dev/null 2>&1 </dev/null &
 sleep 3
-count=$(pgrep -x qml -a 2>/dev/null | grep -c 'windownavigator/overlay' || true)
+count=$(pgrep -x qml -a 2>/dev/null | grep -c 'winwitch/overlay' || true)
 if [ "$count" -ge 1 ]; then
     echo "浮层已启动（实例数 $count）"
 else
     echo "浮层未起来，日志（最后 15 行）：" >&2
-    tail -15 "${XDG_STATE_HOME:-$HOME/.local/state}/windownavigator/overlay.log" 2>/dev/null >&2 || true
+    tail -15 "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/overlay.log" 2>/dev/null >&2 || true
 fi
 
 say "6/6 冒烟测试"
-echo "初始状态：$(timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator io.github.conglinyizhi.WindowNavigator.Status | head -1 | cut -c1-40)"
+echo "初始状态：$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch io.github.conglinyizhi.winwitch.Status | head -1 | cut -c1-40)"
 timeout 15 qdbus6 org.kde.kglobalaccel /component/kwin \
-    org.kde.kglobalaccel.Component.invokeShortcut "窗口导航器 进入选择模式" >/dev/null 2>&1
+    org.kde.kglobalaccel.Component.invokeShortcut "WinWitch 进入选择模式" >/dev/null 2>&1
 sleep 3
-echo "触发后状态：$(timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator io.github.conglinyizhi.WindowNavigator.Status | cut -c1-60)"
+echo "触发后状态：$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch io.github.conglinyizhi.winwitch.Status | cut -c1-60)"
 echo
 echo "浮层上报："
-grep '界面' /tmp/windownavigator.log | tail -3 || echo "  （没有上报，浮层可能没起来）"
+grep '界面' /tmp/winwitch.log | tail -3 || echo "  （没有上报，浮层可能没起来）"
 echo
-echo "最终状态：$(timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator io.github.conglinyizhi.WindowNavigator.Status | head -1 | cut -c1-40)"
+echo "最终状态：$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch io.github.conglinyizhi.winwitch.Status | head -1 | cut -c1-40)"
 
 echo
 echo "明细行的四列是：字母、应用名、图标名、窗口标题。"

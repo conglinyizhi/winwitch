@@ -4,7 +4,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.taskmanager as TaskManager
 
-// 顺序源：把任务栏的图标顺序（含固定应用）、应用名、图标名推给窗口导航器服务。
+// 顺序源：把任务栏的图标顺序（含固定应用）、应用名、图标名推给WinWitch服务。
 //
 // 为什么必须有它：
 //   1. KWin 枚举窗口的顺序与任务栏图标顺序**不一致**（实测任务栏第 0 位是固定应用，
@@ -27,7 +27,7 @@ PlasmoidItem {
 
     // 前缀常量：length 是属性不是函数，别在用的时候现取。
     // 浮层窗口的标题：用它把自己的界面从任务列表里排除掉。
-    readonly property string overlayTitle: "窗口导航器"
+    readonly property string overlayTitle: "WinWitch"
 
     readonly property string applicationsPrefix: "applications:"
     readonly property string preferredPrefix: "preferred://"
@@ -73,8 +73,8 @@ PlasmoidItem {
 
     // 上报不去重：诊断信息必须能在清空日志之后再看到。
     function report(tag) {
-        noteSource.connectSource("qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator "
-                                 + "io.github.conglinyizhi.WindowNavigator.Note order-source-" + tag);
+        noteSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
+                                 + "io.github.conglinyizhi.winwitch.Note order-source-" + tag);
     }
 
     // 命令是交给 shell 解释的（引擎用 KProcess::setShellCommand），
@@ -411,8 +411,8 @@ PlasmoidItem {
                  + ";showTitle=" + (showTitle ? "1" : "0");
         // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
-        configSource.connectSource("qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator "
-                                   + "io.github.conglinyizhi.WindowNavigator.Config " + root.shellQuote(text));
+        configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
+                                   + "io.github.conglinyizhi.winwitch.Config " + root.shellQuote(text));
     }
 
     P5Support.DataSource {
@@ -461,8 +461,8 @@ PlasmoidItem {
         if (payload === "") {
             return;
         }
-        orderSource.connectSource("qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator "
-                                  + "io.github.conglinyizhi.WindowNavigator.Order " + root.shellQuote(payload));
+        orderSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
+                                  + "io.github.conglinyizhi.winwitch.Order " + root.shellQuote(payload));
     }
 
     Timer {

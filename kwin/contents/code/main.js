@@ -1,4 +1,4 @@
-// 窗口导航器 · KWin 侧
+// WinWitch · KWin 侧
 //
 // 职责边界（刻意保持很薄）：
 //   - 注册入口快捷键；
@@ -16,9 +16,9 @@
 // 因此：只注册 `Meta+F`，另加**一个没有按键的快捷键**用于提交。
 // 空序列不占用任何组合键，只能按名字触发，因此不会遮蔽任何东西。
 
-var SERVICE = "io.github.conglinyizhi.WindowNavigator";
-var PATH = "/WindowNavigator";
-var IFACE = "io.github.conglinyizhi.WindowNavigator";
+var SERVICE = "io.github.conglinyizhi.winwitch";
+var PATH = "/winwitch";
+var IFACE = "io.github.conglinyizhi.winwitch";
 
 // 前缀常量：length 是属性不是函数，别在用的时候现取（踩过两次）。
 var ACTIVATE_PREFIX = "activate:";
@@ -27,10 +27,10 @@ var ERROR_PREFIX = "error";
 // 浮层自己的窗口标题，绝不能当成可切换目标。
 // 窗口类型设了 Qt.Tool，但 Wayland 下 KWin 仍会把它算进窗口列表，
 // 结果浮层自己占一个字母（用户实测发现过）。
-var OVERLAY_TITLE = "窗口导航器";
+var OVERLAY_TITLE = "WinWitch";
 
 // 选中之后由界面触发的那一个动作名。没有按键，只按名字触发。
-var COMMIT_SHORTCUT = "窗口导航器 提交选择";
+var COMMIT_SHORTCUT = "WinWitch 提交选择";
 
 // 最近一次 Begin 拿到的 token。空表示当前没有会话；陈旧 token 由 helper 拒绝。
 var sessionToken = "";
@@ -109,11 +109,11 @@ function beginSelection() {
         var parts = text.split("\t");
         if (parts.length === 0 || parts[0] === "" || parts[0].indexOf(ERROR_PREFIX) === 0) {
             sessionToken = "";
-            print("windownavigator: 进入选择模式失败，reply=" + text);
+            print("winwitch: 进入选择模式失败，reply=" + text);
             return;
         }
         sessionToken = parts[0];
-        print("windownavigator: 选择模式开始 token=" + sessionToken +
+        print("winwitch: 选择模式开始 token=" + sessionToken +
               " 映射=" + parts.slice(1).join(" "));
     });
 }
@@ -126,7 +126,7 @@ function callCancel() {
         return;
     }
     callDBus(SERVICE, PATH, IFACE, "Cancel", token, function () {
-        print("windownavigator: 已取消");
+        print("winwitch: 已取消");
     });
 }
 
@@ -137,14 +137,14 @@ function activateWindowById(id) {
             try {
                 var title = windowTitleOf(windows[i]);
                 workspace.activeWindow = windows[i];
-                print("windownavigator: 已激活 " + title);
+                print("winwitch: 已激活 " + title);
             } catch (e) {
-                print("windownavigator: 激活抛错 " + e);
+                print("winwitch: 激活抛错 " + e);
             }
             return true;
         }
     }
-    print("windownavigator: 目标窗口已不存在，忽略 " + id);
+    print("winwitch: 目标窗口已不存在，忽略 " + id);
     return false;
 }
 
@@ -168,7 +168,7 @@ function init() {
     var prefix = readConfigString("shortcutPrefix", "Meta+F");
 
     registerShortcut(
-        "窗口导航器 进入选择模式",
+        "WinWitch 进入选择模式",
         "显示窗口字母标签并进入选择模式",
         prefix,
         beginSelection
@@ -183,7 +183,7 @@ function init() {
         commitSelection
     );
 
-    print("windownavigator: 已注册，入口 " + prefix + "，提交动作无按键");
+    print("winwitch: 已注册，入口 " + prefix + "，提交动作无按键");
 }
 
 // 脚本重载或 KWin 退出时不留半开状态。

@@ -8,7 +8,7 @@
 pub fn introspection_xml() -> String {
   let xml =
     #|<node>
-    #|  <interface name="io.github.conglinyizhi.WindowNavigator">
+    #|  <interface name="io.github.conglinyizhi.winwitch">
     #|    <method name="Begin">
     #|      <arg name="windows" type="s" direction="in"/>
     #|      <arg name="assignment" type="s" direction="out"/>

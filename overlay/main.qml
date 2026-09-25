@@ -3,7 +3,7 @@ import QtQuick.Window
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
 
-// 窗口导航器 · 浮层
+// WinWitch · 浮层
 //
 // 独立进程，不是面板组件：选择模式期间浮出一排卡片，说明「这个字母对应哪个窗口」
 // （字母 + 图标 + 应用名 + 窗口标题），结束后消失。
@@ -19,16 +19,16 @@ Window {
     // 否则它会作为一个「可切换窗口」混进来占一个字母（用户实测发现过）。
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
-    title: "窗口导航器"
+    title: "WinWitch"
 
     property bool selecting: false
     property string token: ""
     // 每行 { letter, title, appName, iconName }
     property var rows: []
 
-    readonly property string serviceName: "io.github.conglinyizhi.WindowNavigator"
-    readonly property string objectPath: "/WindowNavigator"
-    readonly property string interfaceName: "io.github.conglinyizhi.WindowNavigator"
+    readonly property string serviceName: "io.github.conglinyizhi.winwitch"
+    readonly property string objectPath: "/winwitch"
+    readonly property string interfaceName: "io.github.conglinyizhi.winwitch"
     readonly property string selectingPrefix: "selecting:"
     readonly property string idlePrefix: "idle:"
 
@@ -270,7 +270,7 @@ Window {
     function commitSelection() {
         actionSource.connectSource(
             "qdbus6 org.kde.kglobalaccel /component/kwin "
-            + "org.kde.kglobalaccel.Component.invokeShortcut \"窗口导航器 提交选择\"");
+            + "org.kde.kglobalaccel.Component.invokeShortcut \"WinWitch 提交选择\"");
     }
 
     P5Support.DataSource {

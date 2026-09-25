@@ -1,4 +1,4 @@
-name = "conglinyizhi/windownavigator"
+name = "conglinyizhi/winwitch"
 
 version = "0.1.0"
 

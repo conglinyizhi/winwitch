@@ -1,10 +1,10 @@
 {
     "KPackageStructure": "KWin/Script",
     "KPlugin": {
-        "Name": "窗口导航器",
+        "Name": "WinWitch",
         "Description": "按 Meta+F 后，用单个字母切换到对应窗口；Esc 立即取消。",
         "Icon": "preferences-system-windows",
-        "Id": "windownavigator",
+        "Id": "winwitch",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Authors": [

@@ -1,10 +1,10 @@
 {
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Name": "窗口导航器",
-        "Description": "窗口导航器的面板侧组件：提供任务栏顺序与应用元信息，并承载设置入口。",
+        "Name": "WinWitch",
+        "Description": "WinWitch的面板侧组件：提供任务栏顺序与应用元信息，并承载设置入口。",
         "Icon": "preferences-system-windows",
-        "Id": "io.github.conglinyizhi.windownavigator.panel",
+        "Id": "io.github.conglinyizhi.winwitch.panel",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Category": "Windows and Tasks",

@@ -14,9 +14,9 @@ PlasmoidItem {
     property string token: ""
     property var letters: []
 
-    readonly property string serviceName: "io.github.conglinyizhi.WindowNavigator"
-    readonly property string objectPath: "/WindowNavigator"
-    readonly property string interfaceName: "io.github.conglinyizhi.WindowNavigator"
+    readonly property string serviceName: "io.github.conglinyizhi.winwitch"
+    readonly property string objectPath: "/winwitch"
+    readonly property string interfaceName: "io.github.conglinyizhi.winwitch"
 
     // "selecting:" 共 10 个字符
     readonly property int selectingPrefixLength: 10
@@ -160,7 +160,7 @@ PlasmoidItem {
     function activateLetter(letter) {
         actionSource.connectSource(
             "qdbus6 org.kde.kglobalaccel /component/kwin "
-            + "org.kde.kglobalaccel.Component.invokeShortcut \"窗口导航器 " + letter + "\"");
+            + "org.kde.kglobalaccel.Component.invokeShortcut \"WinWitch " + letter + "\"");
     }
 
     P5Support.DataSource {
@@ -277,7 +277,7 @@ PlasmoidItem {
 
     fullRepresentation: compactRepresentation
 
-    toolTipMainText: "窗口导航器"
+    toolTipMainText: "WinWitch"
     toolTipSubText: root.selecting
         ? "选择中：" + root.letters.join(" ") + "　按字母切换窗口，Esc 取消"
         : "空闲。按 Meta+F 进入选择模式"

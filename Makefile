@@ -1,4 +1,4 @@
-# 窗口导航器 · 常用操作
+# WinWitch · 常用操作
 #
 # 这些步骤踩过坑，别手敲：
 #   - 改 QML 后必须重启浮层进程（它是独立进程，不必重启 plasmashell）
@@ -58,28 +58,28 @@ uninstall: ## 卸载
 
 .PHONY: cancel
 cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
-	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /LetterSwitch \
-		io.github.conglinyizhi.WindowNavigator.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \
+	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+		io.github.conglinyizhi.winwitch.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \
 	if [ -z "$$token" ] || [ "$$token" = "idle" ]; then \
 		echo "当前不在选择模式"; \
 	else \
-		timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /LetterSwitch \
-			io.github.conglinyizhi.WindowNavigator.Cancel "$$token" && echo "已撤销 $$token"; \
+		timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+			io.github.conglinyizhi.winwitch.Cancel "$$token" && echo "已撤销 $$token"; \
 	fi
 
 .PHONY: status
 status: ## 查看当前状态：进程、顺序源、D-Bus 状态
 	@echo "== 进程 =="
-	@pgrep -x windownavigator -a || echo "  helper 未运行"
-	@pgrep -x qml -a | grep windownavigator/overlay || echo "  浮层未运行"
+	@pgrep -x winwitch -a || echo "  helper 未运行"
+	@pgrep -x qml -a | grep winwitch/overlay || echo "  浮层未运行"
 	@echo "== D-Bus =="
-	@timeout 8 qdbus6 io.github.conglinyizhi.WindowNavigator /LetterSwitch \
-		io.github.conglinyizhi.WindowNavigator.Status 2>&1 | head -1 | cut -c1-60 || echo "  查询失败"
+	@timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+		io.github.conglinyizhi.winwitch.Status 2>&1 | head -1 | cut -c1-60 || echo "  查询失败"
 	@echo "== KWin 脚本 =="
 	@timeout 8 qdbus6 org.kde.KWin /Scripting \
-		org.kde.kwin.Scripting.isScriptLoaded windownavigator 2>&1
+		org.kde.kwin.Scripting.isScriptLoaded winwitch 2>&1
 	@echo "== 面板 =="
 	@timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
 		"$$(cat $(REPO)/scripts/panel-status.js)" 2>&1 | tail -1 || echo "  plasmashell 不可达"
 	@echo "== 日志尾部 =="
-	@tail -5 /tmp/windownavigator.log 2>/dev/null | tr -d '\000' || echo "  无日志"
+	@tail -5 /tmp/winwitch.log 2>/dev/null | tr -d '\000' || echo "  无日志"

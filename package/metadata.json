@@ -1,10 +1,10 @@
 {
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Name": "窗口导航器",
-        "Description": "显示窗口导航器当前可用的字母，点击即可切换窗口。",
+        "Name": "WinWitch",
+        "Description": "显示WinWitch当前可用的字母，点击即可切换窗口。",
         "Icon": "preferences-system-windows",
-        "Id": "io.github.conglinyizhi.windownavigator.strip",
+        "Id": "io.github.conglinyizhi.winwitch.strip",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Category": "Windows and Tasks",

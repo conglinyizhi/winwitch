@@ -1,5 +1,5 @@
 import {
-  "conglinyizhi/windownavigator/core",
+  "conglinyizhi/winwitch/core",
   "conglinyizhi/moondbus/src" @dbus,
   "moonbitlang/core/env",
 }
