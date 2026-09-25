@@ -111,6 +111,13 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
       println("letterswitch[界面] \{first_arg(ctx.body)}")
       string_reply("ok")
     }
+    // 面板组件报来的任务栏顺序（窗口 ID，逗号分隔）。
+    // KWin 的枚举顺序与任务栏不一致，靠这个把字母对齐到任务栏。
+    "Order" => {
+      let order = @core.split_char(first_arg(ctx.body), ',')
+      session.set_preferred_order(order) |> ignore
+      string_reply("ok")
+    }
     _ => string_reply("error:unknown-method")
   }
 }

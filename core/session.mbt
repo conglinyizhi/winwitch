@@ -31,11 +31,12 @@ pub(all) struct Session {
   mut next_token : Int
   mut labels : Array[Label]
   mut tasks : Array[TaskMeta]
+  mut preferred_order : Array[String]
 }
 
 ///|
 pub fn Session::new() -> Session {
-  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [] }
+  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], preferred_order: [] }
 }
 
 ///|
@@ -71,6 +72,9 @@ pub fn Session::begin(
   // 这条路径只有 ID，没有标题；不要留下 tasks，否则快照会多出空明细行。
   self.tasks = []
   self.phase = Selecting
+  if self.preferred_order.length() > 0 {
+    self.reorder(self.preferred_order, alphabet~) |> ignore
+  }
   self.labels
 }
 
@@ -89,7 +93,59 @@ pub fn Session::begin_tasks(
   self.labels = assign_labels(ids, alphabet~)
   self.tasks = tasks
   self.phase = Selecting
+  // 界面给过首选顺序（任务栏顺序）就按它排；KWin 的枚举顺序与任务栏不一致。
+  if self.preferred_order.length() > 0 {
+    self.reorder(self.preferred_order, alphabet~) |> ignore
+  }
   self.labels
+}
+
+///|
+/// 按给定顺序重排字母。
+///
+/// 用于「字母顺序跟随任务栏」：面板组件把任务栏顺序（窗口 ID）发过来，据此重排。
+/// - 只保留仍在当前会话里的窗口；
+/// - 未出现在 `order` 里的窗口按原有相对顺序补在后面，不会丢；
+/// - 空列表时保持原样。
+pub fn Session::reorder(
+  self : Session,
+  order : Array[String],
+  alphabet? : String = default_alphabet,
+) -> Array[Label] {
+  let present : Array[String] = []
+  for l in self.labels {
+    present.push(l.window_id)
+  }
+  let ordered : Array[String] = []
+  for id in order {
+    if present.contains(id) && !ordered.contains(id) {
+      ordered.push(id)
+    }
+  }
+  for id in present {
+    if !ordered.contains(id) {
+      ordered.push(id)
+    }
+  }
+  if ordered.length() > 0 {
+    self.labels = assign_labels(ordered, alphabet~)
+  }
+  self.labels
+}
+
+///|
+/// 记住界面给出的首选顺序；若当前正在选择，立即生效。
+pub fn Session::set_preferred_order(
+  self : Session,
+  order : Array[String],
+  alphabet? : String = default_alphabet,
+) -> Array[Label] {
+  self.preferred_order = order
+  if self.phase is Selecting {
+    self.reorder(order, alphabet~)
+  } else {
+    self.labels
+  }
 }
 
 ///|

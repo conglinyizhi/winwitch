@@ -68,14 +68,24 @@ sed "s|@WRAPPER@|$bin_dir/letterswitch-overlay|" \
 chmod 644 "$autostart_dir/letterswitch-overlay.desktop"
 echo "已安装浮层：$data_dir/overlay/main.qml"
 
-say "5/5 清掉旧的面板组件"
+say "5/5 安装面板顺序源"
 kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.labels >/dev/null 2>&1 || true
+kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.probe >/dev/null 2>&1 || true
 rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.labels"
-if timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
-        "$(cat "$repo/scripts/remove-panel-widget.js")" >/dev/null 2>&1; then
-    echo "已从面板移除旧组件"
+rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.probe"
+kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.order >/dev/null 2>&1 || true
+rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.order"
+kpackagetool6 --type Plasma/Applet --install "$repo/panel" >/dev/null
+# 顺序源必须在面板上才能读任务模型；它本身不绘制任何内容。
+# 重装后 QML 变了，plasmashell 会继续跑内存里的旧版本，所以清缓存并重启一次。
+rm -rf "$HOME/.cache/plasmashell/qmlcache"
+systemctl --user restart plasma-plasmashell.service
+sleep 6
+if timeout 15 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+        "$(cat "$repo/scripts/ensure-panel.js")" >/dev/null 2>&1; then
+    echo "已处理面板顺序源"
 else
-    echo "提示：plasmashell 不可达，若面板上还有旧的字母条，右键移除即可"
+    echo "提示：plasmashell 不可达，顺序源未加入面板，字母将按 KWin 顺序分配"
 fi
 
 say "安装完成"
@@ -83,5 +93,5 @@ echo "启动（或改用 scripts/reload.sh 一步到位）："
 echo "  nohup stdbuf -oL $bin_dir/letterswitch >/tmp/letterswitch.log 2>&1 &"
 echo "  nohup $bin_dir/letterswitch-overlay >/dev/null 2>&1 &"
 echo
-echo "自检：qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status"
-echo "      空闲时应输出 idle:t0"
+echo "自检：qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Order"
+echo "      以及 qdbus6 ...Status（空闲时应输出 idle:t0）"

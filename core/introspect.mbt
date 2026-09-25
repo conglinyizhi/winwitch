@@ -28,6 +28,10 @@ pub fn introspection_xml() -> String {
     #|      <arg name="text" type="s" direction="in"/>
     #|      <arg name="result" type="s" direction="out"/>
     #|    </method>
+    #|    <method name="Order">
+    #|      <arg name="window_ids" type="s" direction="in"/>
+    #|      <arg name="result" type="s" direction="out"/>
+    #|    </method>
     #|  </interface>
     #|  <interface name="org.freedesktop.DBus.Introspectable">
     #|    <method name="Introspect">
@@ -45,5 +49,5 @@ pub fn introspection_xml() -> String {
 ///|
 /// 服务对外暴露的方法名。自省 XML 与分发逻辑都以此为准，避免两边写岔。
 pub fn method_names() -> Array[String] {
-  ["Begin", "Key", "Cancel", "Status", "Note"]
+  ["Begin", "Key", "Cancel", "Status", "Note", "Order"]
 }

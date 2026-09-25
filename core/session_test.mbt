@@ -196,3 +196,58 @@ test "取消后快照回到空闲且不留明细" {
   session.clear()
   assert_eq(session.snapshot(), "idle:t2")
 }
+
+///|
+test "首选顺序可以把任务栏顺序套到字母上" {
+  let session = @core.Session::new()
+  ignore(session.begin(["kwin1", "kwin2", "kwin3"]))
+  // 任务栏顺序是 3、1、2
+  ignore(session.set_preferred_order(["kwin3", "kwin1", "kwin2"]))
+  let labels = session.labels()
+  assert_eq(labels[0].window_id, "kwin3")
+  assert_eq(labels[1].window_id, "kwin1")
+  assert_eq(labels[2].window_id, "kwin2")
+  assert_eq(labels[0].letter, "A")
+}
+
+///|
+test "首选顺序里没有的窗口补在后面不丢" {
+  let session = @core.Session::new()
+  ignore(session.begin(["w1", "w2", "w3"]))
+  ignore(session.set_preferred_order(["w3"]))
+  let labels = session.labels()
+  assert_eq(labels.length(), 3)
+  assert_eq(labels[0].window_id, "w3")
+  // 其余两个保持原有相对顺序
+  assert_eq(labels[1].window_id, "w1")
+  assert_eq(labels[2].window_id, "w2")
+}
+
+///|
+test "首选顺序里的陌生窗口被忽略" {
+  let session = @core.Session::new()
+  ignore(session.begin(["w1", "w2"]))
+  ignore(session.set_preferred_order(["不存在", "w2", "w1"]))
+  let labels = session.labels()
+  assert_eq(labels.length(), 2)
+  assert_eq(labels[0].window_id, "w2")
+  assert_eq(labels[1].window_id, "w1")
+}
+
+///|
+test "空闲时设置首选顺序不产生标签" {
+  let session = @core.Session::new()
+  let labels = session.set_preferred_order(["w1"])
+  assert_eq(labels.length(), 0)
+  assert_eq(session.snapshot(), "idle:t0")
+}
+
+///|
+test "首选顺序在下次开始时自动生效" {
+  let session = @core.Session::new()
+  ignore(session.set_preferred_order(["b", "a"]))
+  ignore(session.begin(["a", "b"]))
+  let labels = session.labels()
+  assert_eq(labels[0].window_id, "b")
+  assert_eq(labels[1].window_id, "a")
+}

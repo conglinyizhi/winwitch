@@ -37,8 +37,16 @@ kwriteconfig6 --file kwinrc --group Plugins --key letterswitchEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 2
 
-say "2.5/6 确保面板上没有旧组件"
-timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$(cat "$repo/scripts/remove-panel-widget.js")" >/dev/null 2>&1 || true
+say "2.5/6 确保面板顺序源就位"
+kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.order >/dev/null 2>&1 || true
+rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.order"
+kpackagetool6 --type Plasma/Applet --install "$repo/panel" >/dev/null
+# 重装后 QML 变了，plasmashell 会继续跑内存里的旧版本，必须重启一次并清缓存。
+rm -rf "$HOME/.cache/plasmashell/qmlcache"
+systemctl --user restart plasma-plasmashell.service
+sleep 6
+timeout 15 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+    "$(cat "$repo/scripts/ensure-panel.js")" >/dev/null 2>&1 || true
 
 say "3/6 更新浮层"
 mkdir -p "$data_dir/overlay"
@@ -75,7 +83,7 @@ else
 fi
 
 say "6/6 冒烟测试"
-echo "初始状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-40)"
+echo "初始状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | head -1 | cut -c1-40)"
 timeout 15 qdbus6 org.kde.kglobalaccel /component/kwin \
     org.kde.kglobalaccel.Component.invokeShortcut "字母切窗 进入选择模式" >/dev/null 2>&1
 sleep 3
@@ -89,4 +97,5 @@ sleep 11
 echo "最终状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-40)"
 
 echo
-echo "完成。有 overlay-selecting 上报且最后回到 idle，说明链路是通的。"
+echo "看上面的明细行：第一个字母对应的窗口应与任务栏第一个图标一致。"
+echo "若不一致，多半是面板上的「顺序源」组件没跑起来（make status 可查）。"
