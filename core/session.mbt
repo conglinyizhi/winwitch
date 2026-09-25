@@ -31,12 +31,12 @@ pub(all) struct Session {
   mut next_token : Int
   mut labels : Array[Label]
   mut tasks : Array[TaskMeta]
-  mut preferred_order : Array[String]
+  mut slots : Array[Slot]
 }
 
 ///|
 pub fn Session::new() -> Session {
-  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], preferred_order: [] }
+  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [], slots: [] }
 }
 
 ///|
@@ -72,8 +72,8 @@ pub fn Session::begin(
   // 这条路径只有 ID，没有标题；不要留下 tasks，否则快照会多出空明细行。
   self.tasks = []
   self.phase = Selecting
-  if self.preferred_order.length() > 0 {
-    self.reorder(self.preferred_order, alphabet~) |> ignore
+  if self.slots.length() > 0 {
+    self.relabel_by_slots(self.slots, alphabet)
   }
   self.labels
 }
@@ -94,8 +94,8 @@ pub fn Session::begin_tasks(
   self.tasks = tasks
   self.phase = Selecting
   // 界面给过首选顺序（任务栏顺序）就按它排；KWin 的枚举顺序与任务栏不一致。
-  if self.preferred_order.length() > 0 {
-    self.reorder(self.preferred_order, alphabet~) |> ignore
+  if self.slots.length() > 0 {
+    self.relabel_by_slots(self.slots, alphabet)
   }
   self.labels
 }
@@ -140,12 +140,93 @@ pub fn Session::set_preferred_order(
   order : Array[String],
   alphabet? : String = default_alphabet,
 ) -> Array[Label] {
-  self.preferred_order = order
-  if self.phase is Selecting {
-    self.reorder(order, alphabet~)
-  } else {
-    self.labels
+  let slots : Array[Slot] = []
+  for id in order {
+    slots.push({ ids: [id], app_name: "", icon_name: "", title: "" })
   }
+  self.set_slots(slots, alphabet~)
+}
+
+///|
+/// 判断某个窗口是否已经分配了字母。
+fn label_exists(labels : Array[Label], id : String) -> Bool {
+  for l in labels {
+    if l.window_id == id {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 按任务栏位置重排字母。
+///
+/// 每个位置依次占用一个字母：位置里没有窗口（启动器、常驻图标）就空掉一个字母，
+/// 位置里有多个窗口（分组）就连续占用多个字母。这样字母与图标的相对位置一致；
+/// 若把启动器行直接跳过，后面所有字母都会相对图标整体前移（实测会被用户认为「乱套」）。
+fn Session::relabel_by_slots(
+  self : Session,
+  slots : Array[Slot],
+  alphabet : String,
+) -> Unit {
+  let present : Array[String] = []
+  for l in self.labels {
+    present.push(l.window_id)
+  }
+  let out : Array[Label] = []
+  let mut slot_index = 0
+  for slot in slots {
+    if slot_index >= alphabet.length() {
+      break
+    }
+    if slot.ids.length() == 0 {
+      // 占位：消耗一个字母，但不产生标签
+      slot_index = slot_index + 1
+      continue
+    }
+    for id in slot.ids {
+      if slot_index >= alphabet.length() {
+        break
+      }
+      if present.contains(id) && !label_exists(out, id) {
+        match alphabet.get_char(slot_index) {
+          Some(ch) => out.push({ letter: ch.to_string(), window_id: id })
+          None => ()
+        }
+        slot_index = slot_index + 1
+      }
+    }
+  }
+  // 槽位里没提到的窗口补在后面，一个都不丢
+  for id in present {
+    if slot_index >= alphabet.length() {
+      break
+    }
+    if !label_exists(out, id) {
+      match alphabet.get_char(slot_index) {
+        Some(ch) => out.push({ letter: ch.to_string(), window_id: id })
+        None => ()
+      }
+      slot_index = slot_index + 1
+    }
+  }
+  if out.length() > 0 {
+    self.labels = out
+  }
+}
+
+///|
+/// 记住面板推来的任务栏槽位；若当前正在选择，立即重排字母。
+pub fn Session::set_slots(
+  self : Session,
+  slots : Array[Slot],
+  alphabet? : String = default_alphabet,
+) -> Array[Label] {
+  self.slots = slots
+  if self.phase is Selecting {
+    self.relabel_by_slots(slots, alphabet)
+  }
+  self.labels
 }
 
 ///|
@@ -231,6 +312,6 @@ pub fn Session::snapshot(self : Session) -> String {
   if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
     head
   } else {
-    head + "\n" + encode_detail(self.labels, self.tasks)
+    head + "\n" + encode_detail_full(self.labels, self.tasks, self.slots)
   }
 }

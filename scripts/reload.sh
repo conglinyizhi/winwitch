@@ -92,10 +92,10 @@ echo
 echo "浮层上报："
 grep '界面' /tmp/letterswitch.log | tail -3 || echo "  （没有上报，浮层可能没起来）"
 echo
-echo "等待看门狗（8 秒）……"
-sleep 11
-echo "最终状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-40)"
+echo "最终状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | head -1 | cut -c1-40)"
 
 echo
-echo "看上面的明细行：第一个字母对应的窗口应与任务栏第一个图标一致。"
-echo "若不一致，多半是面板上的「顺序源」组件没跑起来（make status 可查）。"
+echo "明细行的四列是：字母、应用名、图标名、窗口标题。"
+echo "第一个字母应与任务栏第一个图标一致（启动器图标会空掉一个字母位）。"
+echo "若顺序不对，先看面板上的「顺序源」是否在跑（make status）。"
+echo "注：刻意没有自动超时，退出只靠 Esc 或选中字母；上面保持 selecting 是正常的。"

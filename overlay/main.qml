@@ -5,20 +5,23 @@ import org.kde.kirigami as Kirigami
 
 // 字母切窗 · 浮层
 //
-// 独立进程，不是面板组件：选择模式期间浮出一排卡片，每张卡片说明
-// 「这个字母对应哪个窗口」（字母 + 图标 + 标题），结束后消失。
+// 独立进程，不是面板组件：选择模式期间浮出一排卡片，说明「这个字母对应哪个窗口」
+// （字母 + 图标 + 应用名 + 窗口标题），结束后消失。
 // 用 qml6 运行：qml6 /path/to/main.qml
+//
+// 刻意没有自动超时：退出只靠 Esc 或选中某个字母。之前加过 8 秒兜底，提督明确不要。
 Window {
     id: overlay
 
-    // 不抢焦点：否则浮层一出现就把当前窗口的焦点拿走，接着按字母会打到浮层上。
-    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+    // 选择模式期间要收键盘，所以窗口必须能拿焦点；不显示时它只是个隐藏窗口，
+    // 不会干扰任何东西。
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
     title: "字母切窗"
 
     property bool selecting: false
     property string token: ""
-    // 每行 { letter, title, appId }
+    // 每行 { letter, title, appName, iconName }
     property var rows: []
 
     readonly property string serviceName: "org.clyzhi.LetterSwitch"
@@ -27,12 +30,8 @@ Window {
     readonly property string selectingPrefix: "selecting:"
     readonly property string idlePrefix: "idle:"
 
-    // 兜底时长。KWin 脚本里的 callLater 实测会漏触发，所以看门狗放在这里。
-    readonly property int selectionTimeoutMs: 8000
-    property double selectingSince: 0
-
-    readonly property int cardWidth: Math.round(Kirigami.Units.gridUnit * 11)
-    readonly property int cardHeight: Math.round(Kirigami.Units.gridUnit * 2.2)
+    readonly property int cardWidth: Math.round(Kirigami.Units.gridUnit * 12)
+    readonly property int cardHeight: Math.round(Kirigami.Units.gridUnit * 2.6)
     readonly property int cardSpacing: Math.round(Kirigami.Units.smallSpacing)
     readonly property int cardPadding: Kirigami.Units.smallSpacing * 2
 
@@ -54,8 +53,27 @@ Window {
     x: Math.round((screen.width - width) / 2)
     y: Math.round(screen.height - height - Kirigami.Units.gridUnit * 4)
 
-    function statusCommand() {
-        if (overlay.useGdbus) {
+    // 进入选择模式时抢焦点收键盘；退出时窗口隐藏，焦点自然还回去。
+    onSelectingChanged: {
+        if (overlay.selecting) {
+            overlay.requestActivate();
+            keyCatcher.forceActiveFocus();
+        }
+    }
+
+    // 图标名归一化：绝对路径要当文件 URL 处理。
+    function iconSource(name) {
+        if (!name || name === "") {
+            return "application-x-executable";
+        }
+        var text = String(name);
+        if (text.charAt(0) === "/") {
+            return "file://" + text;
+        }
+        return text;
+    }
+
+    function statusCommand() {        if (overlay.useGdbus) {
             return "gdbus call --session --dest " + overlay.serviceName
                  + " --object-path " + overlay.objectPath
                  + " --method " + overlay.interfaceName + ".Status";
@@ -70,16 +88,17 @@ Window {
                                  + " " + overlay.interfaceName + ".Note " + text);
     }
 
-    function watchdogCancel() {
+    // 取消：不激活任何窗口。
+    function cancelSelection() {
+        report("overlay-escape");
         var t = overlay.token;
-        overlay.selectingSince = 0;
         if (t !== "") {
             actionSource.connectSource("qdbus6 " + overlay.serviceName + " " + overlay.objectPath
                                        + " " + overlay.interfaceName + ".Cancel " + t);
         }
     }
 
-    // 解析快照：第一行状态，其余每行 `字母\ttitle\tapp_id`。
+    // 解析快照：第一行状态，其余每行 `字母\t应用名\t图标名\t标题`。
     function applyStatus(raw) {
         var text = (raw || "").trim();
 
@@ -119,7 +138,7 @@ Window {
             }
 
             var letters = [];
-            var parts = assignment.replace(/\\t/g, "\t").split("\t");
+            var parts = assignment.split("\t");
             for (var i = 0; i < parts.length; i++) {
                 var eq = parts[i].indexOf("=");
                 if (eq > 0) {
@@ -127,22 +146,23 @@ Window {
                 }
             }
 
-            // 明细行：字母、标题、应用标识
+            // 明细行：字母、应用名、图标名、窗口标题
             var parsed = [];
             for (var j = 1; j < lines.length; j++) {
                 var row = lines[j].split("\t");
                 if (row.length >= 1 && row[0] !== "") {
                     parsed.push({
                         letter: row[0],
-                        title: row.length > 1 ? row[1] : "",
-                        appId: row.length > 2 ? row[2] : ""
+                        appName: row.length > 1 ? row[1] : "",
+                        iconName: row.length > 2 ? row[2] : "",
+                        title: row.length > 3 ? row[3] : ""
                     });
                 }
             }
             // helper 没给明细时，至少把字母显示出来
             if (parsed.length === 0) {
                 for (var k = 0; k < letters.length; k++) {
-                    parsed.push({ letter: letters[k], title: "", appId: "" });
+                    parsed.push({ letter: letters[k], appName: "", iconName: "", title: "" });
                 }
             }
 
@@ -150,7 +170,6 @@ Window {
             overlay.rows = parsed;
             overlay.selecting = true;
             if (!wasSelecting) {
-                overlay.selectingSince = Date.now();
                 overlay.report("overlay-selecting-token=" + overlay.token
                                + "-letters=" + letters.join(""));
             }
@@ -162,7 +181,6 @@ Window {
             overlay.selecting = false;
             overlay.token = "";
             overlay.rows = [];
-            overlay.selectingSince = 0;
             if (!wasIdle) {
                 overlay.report("overlay-idle");
             }
@@ -235,22 +253,26 @@ Window {
         onTriggered: overlay.pollStatus()
     }
 
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
+    // 键盘接收：选择模式期间浮层持有焦点，字母落到这里而不是当前窗口。
+    Item {
+        id: keyCatcher
+
+        anchors.fill: parent
+        focus: true
+
+        Keys.onPressed: function (event) {
             if (!overlay.selecting) {
-                overlay.selectingSince = 0;
                 return;
             }
-            if (overlay.selectingSince === 0) {
-                overlay.selectingSince = Date.now();
+            if (event.key === Qt.Key_Escape) {
+                overlay.cancelSelection();
+                event.accepted = true;
                 return;
             }
-            if (Date.now() - overlay.selectingSince > overlay.selectionTimeoutMs) {
-                overlay.report("overlay-watchdog-timeout");
-                overlay.watchdogCancel();
+            var text = event.text ? String(event.text).toUpperCase() : "";
+            if (text.length === 1 && text >= "A" && text <= "Z") {
+                overlay.activateLetter(text);
+                event.accepted = true;
             }
         }
     }
@@ -308,24 +330,42 @@ Window {
                             }
                         }
 
-                        // 应用图标
+                        // 图标名可能是主题名，也可能是绝对路径（desktop 文件里直接写的文件），
+                        // 后者要转成 URL 才能被 Icon 加载。
                         Kirigami.Icon {
                             width: card.height - Kirigami.Units.smallSpacing
                             height: width
-                            source: card.modelData.appId !== ""
-                                    ? card.modelData.appId
-                                    : "application-x-executable"
+                            source: overlay.iconSource(card.modelData.iconName)
+                            fallback: "application-x-executable"
                         }
 
-                        // 窗口标题
-                        Text {
-                            width: overlay.cardWidth - card.height * 2
+                        Column {
+                            width: overlay.cardWidth - card.height
                                    - Kirigami.Units.smallSpacing * 3
                             anchors.verticalCenter: parent.verticalCenter
-                            text: card.modelData.title
-                            color: "#f0f0f0"
-                            elide: Text.ElideRight
-                            font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.8)
+
+                            // 应用名：这是「这是什么程序」，放显眼位置
+                            Text {
+                                width: parent.width
+                                text: card.modelData.appName !== ""
+                                      ? card.modelData.appName
+                                      : card.modelData.title
+                                color: "#ffffff"
+                                elide: Text.ElideRight
+                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.85)
+                                font.bold: true
+                            }
+
+                            // 窗口标题：次要信息，缺省不占位
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: (card.modelData.appName !== "" && card.modelData.appName !== card.modelData.title)
+                                      ? card.modelData.title : ""
+                                color: Qt.rgba(1, 1, 1, 0.62)
+                                elide: Text.ElideRight
+                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.68)
+                            }
                         }
                     }
 

@@ -233,3 +233,131 @@ pub fn split_once(text : String, sep : Char) -> (String, String)? {
   }
   Some((left, right))
 }
+
+///|
+/// 任务栏上的一个位置（一个图标）。
+///
+/// 分组时一个图标对应多个窗口；启动器（常驻图标）没有窗口，但它**占一个位置**——
+/// 必须占位，否则后面所有字母都会相对图标错开一位。
+pub(all) struct Slot {
+  ids : Array[String]
+  app_name : String
+  icon_name : String
+  title : String
+} derive(Debug, Eq)
+
+///|
+/// 解析界面推来的任务栏顺序：每行 `<ids 逗号分隔>\t应用名\t图标名\t标题`。
+/// ids 为空的行表示这个图标没有窗口（启动器），仍占一个字母位。
+pub fn parse_slots(text : String) -> Array[Slot] {
+  let out : Array[Slot] = []
+  for line in split_char(text, '\n') {
+    if line != "" {
+      let parts = split_char(line, '\t')
+      let ids : Array[String] = []
+      if parts.length() >= 1 {
+        for id in split_char(parts[0], ',') {
+          let clean = sanitize_field(id)
+          if clean != "" {
+            ids.push(clean)
+          }
+        }
+      }
+      let app_name = if parts.length() >= 2 {
+        sanitize_field(parts[1], max_len=40)
+      } else {
+        ""
+      }
+      let icon_name = if parts.length() >= 3 {
+        sanitize_field(parts[2], max_len=60)
+      } else {
+        ""
+      }
+      let title = if parts.length() >= 4 { sanitize_field(parts[3]) } else { "" }
+      out.push({ ids, app_name, icon_name, title })
+    }
+  }
+  out
+}
+
+///|
+/// 编码槽位（调试与测试用）。
+pub fn encode_slots(slots : Array[Slot]) -> String {
+  let mut out = ""
+  let mut first = true
+  for slot in slots {
+    if !first {
+      out = out + "\n"
+    }
+    first = false
+    let mut ids = ""
+    for i in 0..<slot.ids.length() {
+      if i > 0 {
+        ids = ids + ","
+      }
+      ids = ids + slot.ids[i]
+    }
+    out = out + ids + "\t" + slot.app_name + "\t" + slot.icon_name + "\t" + slot.title
+  }
+  out
+}
+
+///|
+/// 按槽位查窗口对应的位置。
+pub fn find_slot(slots : Array[Slot], id : String) -> Slot? {
+  for slot in slots {
+    if slot.ids.contains(id) {
+      return Some(slot)
+    }
+  }
+  None
+}
+
+///|
+/// 编码给界面看的明细：每行 `字母\t应用名\t图标名\t标题`，顺序与字母分配一致。
+///
+/// 应用名与图标名来自面板推来的槽位（任务模型最准），窗口标题优先用 KWin 的
+/// （更完整），取不到再退回槽位里的。
+pub fn encode_detail_full(
+  labels : Array[Label],
+  tasks : Array[TaskMeta],
+  slots : Array[Slot],
+) -> String {
+  let mut out = ""
+  let mut first = true
+  for label in labels {
+    if !first {
+      out = out + "\n"
+    }
+    first = false
+    let mut app_name = ""
+    let mut icon_name = ""
+    let mut slot_title = ""
+    match find_slot(slots, label.window_id) {
+      Some(slot) => {
+        app_name = slot.app_name
+        icon_name = slot.icon_name
+        slot_title = slot.title
+      }
+      None => ()
+    }
+    let task = find_task(tasks, label.window_id)
+    // 窗口标题优先用 KWin 的 caption（真实窗口标题），取不到再退回槽位的展示文本
+    let mut title = match task {
+      Some(t) => t.title
+      None => ""
+    }
+    if title == "" {
+      title = slot_title
+    }
+    // 应用名兜底：槽位没给就用 KWin 的应用标识
+    if app_name == "" {
+      match task {
+        Some(t) => app_name = t.app_id
+        None => ()
+      }
+    }
+    out = out + label.letter + "\t" + app_name + "\t" + icon_name + "\t" + title
+  }
+  out
+}

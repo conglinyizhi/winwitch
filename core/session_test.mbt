@@ -168,9 +168,11 @@ test "begin_tasks 记住标题并出现在快照里" {
   let tasks = @core.parse_tasks("w1\t编辑器\tkate\nw2\t浏览器\tfirefox")
   let labels = session.begin_tasks(tasks)
   assert_eq(labels.length(), 2)
+  // 明细格式：字母、应用名、图标名、窗口标题。
+  // 没有槽位时应用名退回 KWin 的应用标识，图标名留空。
   assert_eq(
     session.snapshot(),
-    "selecting:t1:A=w1\tS=w2\nA\t编辑器\tkate\nS\t浏览器\tfirefox",
+    "selecting:t1:A=w1\tS=w2\nA\tkate\t\t编辑器\nS\tfirefox\t\t浏览器",
   )
 }
 
@@ -250,4 +252,43 @@ test "首选顺序在下次开始时自动生效" {
   let labels = session.labels()
   assert_eq(labels[0].window_id, "b")
   assert_eq(labels[1].window_id, "a")
+}
+
+///|
+test "启动器位置会空掉一个字母，保证后面与图标对齐" {
+  let session = @core.Session::new()
+  // 任务栏：两个常驻图标在前，然后是 w1、w2
+  let slots = @core.parse_slots("\t启动器A\tapp-a\t\n\t启动器B\tapp-b\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t")
+  ignore(session.begin(["w1", "w2"]))
+  ignore(session.set_slots(slots))
+  let labels = session.labels()
+  // 前两个位置空掉 A、S，w1 拿 D，w2 拿 F
+  assert_eq(labels[0].letter, "D")
+  assert_eq(labels[0].window_id, "w1")
+  assert_eq(labels[1].letter, "F")
+  assert_eq(labels[1].window_id, "w2")
+}
+
+///|
+test "快照带出应用名与图标名" {
+  let session = @core.Session::new()
+  let slots = @core.parse_slots("w1\t飞书\tfeishu\t飞书聊天窗口")
+  ignore(session.begin_tasks(@core.parse_tasks("w1\t窗口标题\tFeishu")))
+  ignore(session.set_slots(slots))
+  assert_eq(session.snapshot(), "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题")
+}
+
+///|
+test "分组图标里的多个窗口连续占字母" {
+  let session = @core.Session::new()
+  let slots = @core.parse_slots("w1,w2\t编辑器\tkate\t\nw3\t浏览器\tfirefox\t")
+  ignore(session.begin(["w1", "w2", "w3"]))
+  ignore(session.set_slots(slots))
+  let labels = session.labels()
+  assert_eq(labels[0].letter, "A")
+  assert_eq(labels[1].letter, "S")
+  assert_eq(labels[2].letter, "D")
+  assert_eq(labels[0].window_id, "w1")
+  assert_eq(labels[1].window_id, "w2")
+  assert_eq(labels[2].window_id, "w3")
 }

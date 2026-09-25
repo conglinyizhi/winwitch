@@ -226,3 +226,28 @@ test "encode_detail 找不到窗口时留空但仍占一行" {
   let tasks = @core.parse_tasks("w1\t存在的窗口\tfirefox")
   assert_eq(@core.encode_detail(labels, tasks), "A\t存在的窗口\tfirefox\nS\t\t")
 }
+
+///|
+test "parse_slots 解析 ids 与三个文本字段" {
+  let slots = @core.parse_slots("w1,w2\t编辑器\tkate\t标题一\n\t启动器\tapp-x\t")
+  debug_inspect(
+    slots,
+    content=(
+      #|[
+      #|  {
+      #|    ids: ["w1", "w2"],
+      #|    app_name: "编辑器",
+      #|    icon_name: "kate",
+      #|    title: "标题一",
+      #|  },
+      #|  { ids: [], app_name: "启动器", icon_name: "app-x", title: "" },
+      #|]
+    ),
+  )
+}
+
+///|
+test "encode_slots 与 parse_slots 往返一致" {
+  let text = "w1\t编辑器\tkate\t标题一\n\t启动器\tapp-x\t"
+  assert_eq(@core.encode_slots(@core.parse_slots(text)), text)
+}
