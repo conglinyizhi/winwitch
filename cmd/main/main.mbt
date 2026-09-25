@@ -115,7 +115,16 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     // KWin 的枚举顺序与任务栏不一致，靠这个把字母对齐到图标位置；
     // 启动器行没有窗口但占一个字母位，否则后面的字母会与图标错开。
     "Order" => {
-      let slots = @core.parse_slots(first_arg(ctx.body))
+      let body = first_arg(ctx.body)
+      if debug_enabled() {
+        println("letterswitch: 收到顺序槽位（每行：ids	应用名	图标名	标题）")
+        for line in @core.split_char(body, '\n') {
+          if line != "" {
+            println("  " + line)
+          }
+        }
+      }
+      let slots = @core.parse_slots(body)
       session.set_slots(slots) |> ignore
       string_reply("ok")
     }

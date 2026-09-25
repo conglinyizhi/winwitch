@@ -26,8 +26,6 @@ PlasmoidItem {
     // 前缀常量：length 是属性不是函数，别在用的时候现取。
     readonly property string applicationsPrefix: "applications:"
 
-    property string lastPushed: ""
-
     // 图标名缓存：应用标识 → 图标名/路径。
     // 为什么不直接猜：应用标识与图标名往往不一样（org.kde.kate 的图标叫 kate），
     // 而模型的 AppIconName 角色实测返回的是展示文本。最可靠的来源是 desktop
@@ -232,12 +230,15 @@ PlasmoidItem {
         return lines.join("\n");
     }
 
+    // 每次都推，不做「内容没变就跳过」的去重。
+    // 踩过的坑：helper 重启后之前推过的顺序就丢了，而面板以为自己推过了，
+    // 于是永远不再推，字母退回 KWin 顺序（与任务栏对不上）。
+    // 每秒一次调用不算什么（Status 轮询本来就是每秒四次）。
     function pushOrder() {
         var payload = root.collectSlots();
-        if (payload === "" || payload === root.lastPushed) {
+        if (payload === "") {
             return;
         }
-        root.lastPushed = payload;
         orderSource.connectSource("qdbus6 org.clyzhi.LetterSwitch /LetterSwitch "
                                   + "org.clyzhi.LetterSwitch.Order " + root.shellQuote(payload));
     }
