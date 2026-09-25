@@ -37,6 +37,15 @@ MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两�
 scripts/install.sh
 ```
 
+改完组件 QML 或 KWin 脚本之后重新装载，用：
+
+```bash
+scripts/reload.sh     # 重装 + 重启 plasmashell + 冒烟测试
+```
+
+这个脚本是有必要的，不是图省事：重装包、清 QML 缓存、删掉面板组件再重新添加，
+都不足以让 plasmashell 用上新文件。详见下面的排查笔记。
+
 脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本与字母条组件，
 写自启动项。之后还需手动完成：
 
@@ -111,7 +120,6 @@ scripts/uninstall.sh
 ## 排查笔记
 
 两个坑，都已在代码里处理：
-
 - **Qt 客户端会先发 Introspect**。qdbus6 这类 Qt 客户端在调用方法前会请求
   `org.freedesktop.DBus.Introspectable.Introspect` 解析签名。服务端若不回包，客户端会一直等，
   表现为「调用挂死」而不是报错。helper 现在实现了自省回复与 `Peer.Ping`。
@@ -121,6 +129,17 @@ scripts/uninstall.sh
 
 helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会刷满日志）：
 排障时用 `LETTERSWITCH_DEBUG=1 letterswitch` 启动。
+
+另外两个耗了不少时间的坑：
+
+- **改完组件 QML 必须重启 plasmashell**。重装包、删 QML 缓存、甚至删掉面板上的组件再重新添加，
+  都不足以让 plasmashell 用上新文件；它会继续跑内存里的旧代码。
+  改完记得 `systemctl --user restart plasma-plasmashell.service`。
+- **不要指望 KWin 脚本里的 `callLater` 做超时**。实测它有时不触发，选择模式会永久停在选中状态。
+  现在由面板组件的 Timer 做看门狗（8 秒），只要组件在跑就能收手。
+- **不要用 `console.*` 传诊断信息**。`console.info` 走 qDebug，默认不进 journal；
+  而报错行号在多处补丁后会指向无关行，徒劳增加排查成本。
+  组件的上报统一走 helper 的 `Note` 方法，日志落在同一个文件里。
 
 ## 已知限制
 
@@ -149,6 +168,7 @@ kwin/           KWin 脚本包
 package/        Plasma 字母条组件包
 data/           自启动项
 scripts/        安装与卸载
+scripts/reload.sh 重装 + 冒烟测试（改完 QML 用它）
 ```
 
 `moondbus` 目前只解出字符串与 u32，所以整套 IPC 刻意只用字符串，两端都不解析整数。

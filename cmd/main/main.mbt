@@ -104,6 +104,12 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
       string_reply(describe(session.handle_cancel(first_arg(ctx.body))))
     // 返回 `idle:<token>` 或 `selecting:<token>:<字母=窗口>...`。
     "Status" => string_reply(session.encode())
+    // 界面层把自己的状态回抛给 helper，日志就能落在一个地方。
+    // 依赖：面板里的 console 既不保证输出，也不保证不会抛错。
+    "Note" => {
+      println("letterswitch[界面] \{first_arg(ctx.body)}")
+      string_reply("ok")
+    }
     _ => string_reply("error:unknown-method")
   }
 }

@@ -6,8 +6,9 @@
 //   - 调用 MoonBit helper（D-Bus）得到决定；
 //   - 激活 helper 指定的窗口。
 //
-// 决策（字母分配、Esc 优先级、会话 token）全在 MoonBit 侧。
-// 这里不做窗口 ID 之间的比较，也不读键盘设备。
+// 决策（字母分配、Esc 优先级、会话 token、超时）全在 MoonBit 与界面侧，
+// 这里**不保存**「是否正在选择」这类状态。早期版本存过，结果界面侧看门狗
+// 取消之后本地标志与 helper 不一致，再按 Meta+F 会变成取消而不是开始。
 
 var SERVICE = "org.clyzhi.LetterSwitch";
 var PATH = "/LetterSwitch";
@@ -16,12 +17,8 @@ var IFACE = "org.clyzhi.LetterSwitch";
 // 与 core 中的 default_alphabet 保持一致：主行 → 上排 → 下排。
 var ALPHABET = "ASDFGHJKLQWERTYUIOPZXCVBNM";
 
-// 选择模式的最长存活时间，超时自动取消，避免卡在半个会话里。
-var SELECTION_TIMEOUT_MS = 4000;
-
+// 最近一次 Begin 拿到的 token。空表示当前没有会话；陈旧 token 由 helper 拒绝。
 var sessionToken = "";
-var selecting = false;
-var timeoutHandle = 0;
 
 function readConfigString(key, fallback) {
     try {
@@ -33,16 +30,6 @@ function readConfigString(key, fallback) {
     } catch (e) {
         return fallback;
     }
-}
-
-function scheduleTimeout(fn, ms) {
-    if (typeof callLater === "function") {
-        return callLater(ms, fn);
-    }
-    if (typeof setTimeout === "function") {
-        return setTimeout(fn, ms);
-    }
-    return 0;
 }
 
 // 可切换窗口：普通窗口、不在任务栏隐藏、不跳过任务切换器。
@@ -72,56 +59,38 @@ function windowIdOf(win) {
     return String(win.internalId);
 }
 
-function clearSelection() {
-    selecting = false;
-    sessionToken = "";
-    if (timeoutHandle && typeof cancelCallLater === "function") {
-        cancelCallLater(timeoutHandle);
-    }
-    timeoutHandle = 0;
-}
-
-// Meta+F：把当前窗口列表交给 helper，拿回字母分配。
+// Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
+// 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
 function beginSelection() {
-    if (selecting) {
-        // 再按一次等于放弃，避免留下半开状态。
-        callCancel();
-        return;
-    }
     var windows = switchableWindows();
     var ids = [];
     for (var i = 0; i < windows.length; i++) {
         ids.push(windowIdOf(windows[i]));
     }
-    var payload = ids.join("\t");
-    callDBus(SERVICE, PATH, IFACE, "Begin", payload, function (reply) {
+    callDBus(SERVICE, PATH, IFACE, "Begin", ids.join("\t"), function (reply) {
         var text = reply ? String(reply) : "";
-        if (text === "" || text.indexOf("ignore") === 0) {
-            clearSelection();
+        var parts = text.split("\t");
+        if (parts.length === 0 || parts[0] === "" || parts[0].indexOf("error") === 0) {
+            sessionToken = "";
+            print("letterswitch: 进入选择模式失败，reply=" + text);
             return;
         }
-        var parts = text.split("\t");
         sessionToken = parts[0];
-        selecting = true;
         print("letterswitch: 选择模式开始 token=" + sessionToken +
               " 映射=" + parts.slice(1).join(" "));
-        timeoutHandle = scheduleTimeout(function () {
-            print("letterswitch: 选择模式超时");
-            callCancel();
-        }, SELECTION_TIMEOUT_MS);
     });
 }
 
+// 取消：不激活任何窗口。Esc 与界面侧看门狗都会走到这里。
 function callCancel() {
-    if (!selecting) {
-        clearSelection();
+    var token = sessionToken;
+    sessionToken = "";
+    if (token === "") {
         return;
     }
-    var token = sessionToken;
     callDBus(SERVICE, PATH, IFACE, "Cancel", token, function () {
         print("letterswitch: 已取消");
     });
-    clearSelection();
 }
 
 function activateWindowById(id) {
@@ -136,27 +105,21 @@ function activateWindowById(id) {
     return false;
 }
 
-// 单个字母：交给 helper 判定，Esc 的优先级也在那边。
+// 单个字母：交给 helper 判定。Esc 的优先级、陈旧 token、超时都在那边。
 function handleLetter(letter) {
-    if (!selecting) {
+    if (sessionToken === "") {
         return;
     }
     var token = sessionToken;
     callDBus(SERVICE, PATH, IFACE, "Key", token + ":" + letter, function (reply) {
         var text = reply ? String(reply) : "ignore";
         if (text.indexOf("activate:") === 0) {
-            var id = text.substring("activate:".length());
-            clearSelection();
-            activateWindowById(id);
+            sessionToken = "";
+            activateWindowById(text.substring("activate:".length()));
         } else if (text === "cancel" || text === "timeout") {
-            clearSelection();
+            sessionToken = "";
         }
     });
-}
-
-// Esc：不激活任何窗口，只清理。helper 会作废 token，迟到的按键自然失效。
-function handleEscape() {
-    callCancel();
 }
 
 function registerLetterShortcuts(prefix, useSequences) {
@@ -189,7 +152,7 @@ function init() {
         "字母切窗 取消",
         "取消选择模式，不切换窗口",
         prefix + ", Escape",
-        handleEscape
+        callCancel
     );
 
     registerLetterShortcuts(prefix, useSequences);
@@ -198,9 +161,10 @@ function init() {
           (useSequences ? "（组合序列）" : "（Meta+Alt+字母 平铺）"));
 }
 
-// 脚本重载或 KWin 退出时不留半开状态。
+// 脚本重载或 KWin 退出时不留半开状态。超时由界面侧看门狗负责：
+// KWin 脚本里的 callLater 实测会漏触发，不能作为唯一保障。
 function cleanup() {
-    clearSelection();
+    callCancel();
 }
 
 init();
