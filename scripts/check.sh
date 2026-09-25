@@ -103,6 +103,29 @@ if grep -vE '^\s*//' panel/contents/ui/configGeneral.qml \
     bad "设置页用了初始化也会触发的信号回写 cfg_，请改用 onActivated / onValueModified / onToggled"
 fi
 
+note "5b. 已安装版本是否就是仓库版本"
+# 这条是给「改了却没装」准备的：我验证时用的是重装后的版本，提督打开设置页看到的
+# 却可能是磁盘上那份旧的，于是「我这儿好好的，你那儿不行」。比对一下，不一致就提示。
+appletsrc_dir="$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel"
+kwin_dir="$HOME/.local/share/kwin/scripts/winwitch"
+overlay_dir="$HOME/.local/share/winwitch/overlay"
+stale=""
+for pair in \
+    "panel/contents/ui/configGeneral.qml:$appletsrc_dir/contents/ui/configGeneral.qml" \
+    "panel/contents/ui/main.qml:$appletsrc_dir/contents/ui/main.qml" \
+    "panel/contents/config/main.xml:$appletsrc_dir/contents/config/main.xml" \
+    "kwin/contents/code/main.js:$kwin_dir/contents/code/main.js" \
+    "overlay/main.qml:$overlay_dir/main.qml"; do
+    repo_file="${pair%%:*}"
+    installed="${pair##*:}"
+    if [ -f "$installed" ] && ! cmp -s "$repo_file" "$installed"; then
+        stale="$stale $repo_file"
+    fi
+done
+if [ -n "$stale" ]; then
+    note "  注意：已安装版本与仓库不一致（跑 make install 再验证）:$stale"
+fi
+
 note "6. MoonBit"
 moon check --target native >/dev/null || bad "moon check 失败"
 
