@@ -56,16 +56,30 @@ reload: ## 重装并重启 helper/浮层，跑一次冒烟测试
 uninstall: ## 卸载
 	@bash $(REPO)/scripts/uninstall.sh
 
+.PHONY: cancel
+cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
+	@token=$$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch \
+		org.clyzhi.LetterSwitch.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \
+	if [ -z "$$token" ] || [ "$$token" = "idle" ]; then \
+		echo "当前不在选择模式"; \
+	else \
+		timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch \
+			org.clyzhi.LetterSwitch.Cancel "$$token" && echo "已撤销 $$token"; \
+	fi
+
 .PHONY: status
-status: ## 查看当前状态：进程、D-Bus 状态、面板是否干净
+status: ## 查看当前状态：进程、顺序源、D-Bus 状态
 	@echo "== 进程 =="
 	@pgrep -x letterswitch -a || echo "  helper 未运行"
 	@pgrep -x qml -a | grep letterswitch/overlay || echo "  浮层未运行"
 	@echo "== D-Bus =="
 	@timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch \
-		org.clyzhi.LetterSwitch.Status 2>&1 | cut -c1-80 || echo "  查询失败"
+		org.clyzhi.LetterSwitch.Status 2>&1 | head -1 | cut -c1-60 || echo "  查询失败"
 	@echo "== KWin 脚本 =="
 	@timeout 8 qdbus6 org.kde.KWin /Scripting \
 		org.kde.kwin.Scripting.isScriptLoaded letterswitch 2>&1
+	@echo "== 面板 =="
+	@timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+		"$$(cat $(REPO)/scripts/panel-status.js)" 2>&1 | tail -1 || echo "  plasmashell 不可达"
 	@echo "== 日志尾部 =="
-	@tail -5 /tmp/letterswitch.log 2>/dev/null || echo "  无日志"
+	@tail -5 /tmp/letterswitch.log 2>/dev/null | tr -d '\000' || echo "  无日志"
