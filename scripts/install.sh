@@ -87,6 +87,13 @@ kpackagetool6 --type Plasma/Applet --install "$repo/panel" >/dev/null
 # 顺序源必须在面板上才能读任务模型；它本身不绘制任何内容。
 # 重装后 QML 变了，plasmashell 会继续跑内存里的旧版本，所以清缓存并重启一次。
 rm -rf "$HOME/.cache/plasmashell/qmlcache"
+# 清掉设置页已废弃的配置键。留着的话 KCM 加载「设置初始属性」会整体失败，
+# 整页的值都读不出存不进（改过键名就得清，见脚本注释）。
+# 必须在 plasmashell 停止时改：它退出时会回写配置。
+systemctl --user stop plasma-plasmashell.service
+python3 "$repo/scripts/prune-panel-keys.py" \
+    "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" \
+    "$repo/panel/contents/config/main.xml" --apply >/dev/null || true
 systemctl --user restart plasma-plasmashell.service
 sleep 6
 if timeout 15 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \

@@ -70,7 +70,31 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     done
 fi
 
-note "5. MoonBit"
+note "5. 配置键与设置页属性对齐"
+# KCM 加载设置页时，会拿配置里的每个键去找页面上对应的 cfg_<键> 属性。
+# 只要有一个键对不上（改键名后留了旧键，或声明了却没写属性），
+# 「设置初始属性」这一步就整体失败：整页的值既读不出也存不进，
+# 用户看到的是「设置项改了没反应」，配置文件里那几项还会凭空消失。
+# 只声明不用不行，只写属性不声明也不行，所以两边必须严格相等。
+xml_keys="$(grep -oE '<entry name="[A-Za-z0-9_]+"' panel/contents/config/main.xml \
+    | sed 's/.*name="//; s/"//' | sort)"
+qml_keys="$(grep -oE 'property (alias|string|bool|int|real) cfg_[A-Za-z0-9_]+' \
+    panel/contents/ui/configGeneral.qml | sed 's/.*cfg_//' | sort)"
+if [ "$xml_keys" != "$qml_keys" ]; then
+    bad "main.xml 的键与 configGeneral.qml 的 cfg_ 属性不一致（左 xml / 右 qml）"
+    diff <(echo "$xml_keys") <(echo "$qml_keys") || true
+fi
+# 另外：废弃键若还留在用户配置里，同样会让整页初始化失败（安装脚本会清，这里只提示）。
+if command -v python3 >/dev/null 2>&1 && [ -f "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" ]; then
+    stale="$(python3 scripts/prune-panel-keys.py \
+        "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" \
+        panel/contents/config/main.xml --check || true)"
+    if [ -n "$stale" ] && [ "$stale" != "0" ]; then
+        note "  提示：用户配置里还有废弃键（$stale），重装或重载后会自动清掉"
+    fi
+fi
+
+note "6. MoonBit"
 moon check --target native >/dev/null || bad "moon check 失败"
 
 if [ "$fail" -ne 0 ]; then

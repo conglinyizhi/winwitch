@@ -17,10 +17,24 @@ KCM.SimpleKCM {
 
     title: "外观"
 
-    property alias cfg_overlayPosition: positionBox.currentValue
+    // 下拉框不能用 property alias 指到 ComboBox.currentValue：那是控件内部属性，
+    // 别名解析不到，KCM 加载时会报 Setting initial properties failed，
+    // 整页的值既读不出也存不进（症状就是「设置项改了没反应」）。
+    // 照 KDE 自家设置页（kclock）的写法：普通属性 + onCurrentIndexChanged 回写。
+    property string cfg_overlayPosition
+    property string cfg_backgroundStyle
     property alias cfg_maxColumns: columnsBox.value
     property alias cfg_showWindowTitle: titleBox.checked
-    property alias cfg_backgroundStyle: styleBox.currentValue
+
+    // 按值找下拉项下标；找不到就落到第一项。
+    function indexOfValue(box, value) {
+        for (var i = 0; i < box.model.length; i++) {
+            if (box.model[i].value === value) {
+                return i;
+            }
+        }
+        return 0;
+    }
 
     Kirigami.FormLayout {
         QQC2.ComboBox {
@@ -34,6 +48,9 @@ KCM.SimpleKCM {
                 { value: "center", text: "屏幕中央" },
                 { value: "top", text: "屏幕顶部居中" }
             ]
+            onCurrentIndexChanged: page.cfg_overlayPosition = currentValue
+            Component.onCompleted: currentIndex = page.indexOfValue(positionBox,
+                                                                    page.cfg_overlayPosition)
         }
 
         QQC2.SpinBox {
@@ -61,6 +78,9 @@ KCM.SimpleKCM {
                 { value: "translucent", text: "半透明（能透出桌面）" },
                 { value: "opaque", text: "完全不透明" }
             ]
+            onCurrentIndexChanged: page.cfg_backgroundStyle = currentValue
+            Component.onCompleted: currentIndex = page.indexOfValue(styleBox,
+                                                                    page.cfg_backgroundStyle)
         }
     }
 }
