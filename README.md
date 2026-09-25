@@ -1,35 +1,41 @@
 # 字母切窗 (Letter Switch)
 
-KDE Plasma 6 / Wayland 下的窗口切换器。按 `Meta+F` 进入选择模式，面板上的字母条显示
-当前可用的字母，按字母切到对应窗口，`Esc` 立即退出且不切换任何窗口。
+KDE Plasma 6 / Wayland 下的窗口切换器。按 `Meta+F` 进入选择模式，屏幕底部浮出一排字母，
+按字母切到对应窗口，`Esc` 立即退出且不切换任何窗口。
 
 ```
-Meta+F              进入选择模式，面板字母条显示可用字母
+Meta+F              进入选择模式，浮出可用字母
 Meta+F, <字母>       切到该字母对应的窗口
 Meta+F, Escape      取消，不切换窗口
 ```
 
 ## 标签显示形态
 
-两个形态，当前部署的是第二个：
+三个形态，当前部署的是第三个：
 
-- **替代任务栏**：字母直接画在任务栏图标右上角，所见即所得。需要用一个精简版任务栏
+- **替代任务栏**：字母直接画在任务栏图标右上角，所见即所得。代价是用一个精简版任务栏
   换掉系统任务栏，会丢掉分组、悬停预览等行为。
-- **字母条（当前）**：面板上一个窄组件，只展示当前可用的字母，点字母也能切窗。
-  不动任务栏，代价是**看不出字母对应哪个窗口**。
+- **面板字母条**（`package/`，保留但默认不安装）：面板上一个窄组件，占一格面板位置。
+- **浮层（当前）**：独立进程，选择模式期间在屏幕底部浮出一排字母，结束后消失。
+  面板上不留任何东西。
 
-## 为什么是这三个部分
+浮层**无法与任务栏图标逐个对齐**：那需要自己接管任务栏渲染。
+浮层能做到的是「选择模式时浮出一排可用字母」。
+
+## 为什么是这几个部分
 
 Plasma 6 Wayland 下，「进入模式后吃掉下一个任意按键」不能只靠 QML 小部件完成，
-也不能让普通进程随便读键盘设备。所以职责拆成三层：
+也不能让普通进程随便读键盘设备。所以职责拆开：
 
 | 部分 | 位置 | 职责 |
 | --- | --- | --- |
-| 状态机与协议 | `core/`（MoonBit） | 字母分配、`Esc` 优先级、会话 token、超时 |
-| 会话服务 | `cmd/main/`（MoonBit + moondbus） | 把状态机以 D-Bus 服务暴露给 KWin 和 Plasma |
-| 窗口与显示 | `kwin/`、`package/` | KWin 枚举/激活窗口；QML 画字母条 |
+| 状态机与协议 | `core/`（MoonBit） | 字母分配、`Esc` 优先级、会话 token |
+| 会话服务 | `cmd/main/`（MoonBit + moondbus） | 把状态机以 D-Bus 服务暴露给 KWin 和浮层 |
+| 键盘与窗口 | `kwin/` | 注册快捷键、枚举/激活窗口 |
+| 显示 | `overlay/` | 独立进程，浮出字母并做超时兜底 |
 
-MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两侧通过 D-Bus 交换字符串。
+MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态；超时由浮层负责。
+三方通过 D—Bus 交换字符串。
 
 ## 安装
 
@@ -37,28 +43,21 @@ MoonBit 侧不接触键盘设备、不写文件；KWin 侧不保存状态。两�
 scripts/install.sh
 ```
 
-改完组件 QML 或 KWin 脚本之后重新装载，用：
+改完代码之后重新装载用：
 
 ```bash
-scripts/reload.sh     # 重装 + 重启 plasmashell + 冒烟测试
+scripts/reload.sh     # 重装 + 重启 helper/浮层 + 冒烟测试
 ```
 
-这个脚本是有必要的，不是图省事：重装包、清 QML 缓存、删掉面板组件再重新添加，
-都不足以让 plasmashell 用上新文件。详见下面的排查笔记。
+这个脚本不是图省事：里面几个顺序（开关插件重载 KWin 脚本、按 QML 路径杀浮层实例）
+都是踩出来的，手敲很容易漏。详见下面的排查笔记。
 
-脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本与字母条组件，
-写自启动项。之后还需手动完成：
+安装脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本、
+浮层（`~/.local/share/letterswitch/overlay/`）、两个自启动项，并清掉旧的面板组件。
+之后只需确认：系统设置 → 窗口管理 → KWin 脚本，看「字母切窗」是否已勾选。
 
-1. 手动跑一次 helper：
-
-   ```bash
-   nohup stdbuf -oL letterswitch >/tmp/letterswitch.log 2>&1 &
-   ```
-
-   `stdbuf -oL` 不能省：MoonBit 的 stdout 在重定向到文件时是全缓冲，不加就看不到任何日志。
-
-2. 系统设置 → 窗口管理 → KWin 脚本，确认「字母切窗」已勾选。
-3. 面板添加「字母切窗 字母条」组件。
+helper 的启动需要 `stdbuf -oL`（自启动项里已经写好了）：
+MoonBit 的 stdout 重定向到文件时是全缓冲，不加就看不到任何日志。
 
 自检：
 
@@ -83,6 +82,7 @@ scripts/uninstall.sh
 | `Key` | `<token>:<按键>` | `activate:<窗口>` / `cancel` / `ignore` |
 | `Cancel` | `<token>` | `cancel` / `ignore` |
 | `Status` | 无 | `idle:<token>` / `selecting:<token>:<字母=窗口>…` |
+| `Note` | 文本 | `ok`（浮层把自身状态回抛给 helper，便于一处排查） |
 
 约定：
 
@@ -115,7 +115,8 @@ scripts/uninstall.sh
 - 仓库：`~/disk/ai_workspace/kde-winwitch`
 - helper：`~/.local/bin/letterswitch`，由 `~/.config/autostart/letterswitch-helper.desktop` 自启
 - KWin 脚本：已启用（`kwinrc` 的 `letterswitchEnabled=true`）
-- 字母条：已添加到面板末尾（applet id 36，用右键 → 移除即可拆下）
+- 浮层：`~/.local/share/letterswitch/overlay/main.qml`，由 `letterswitch-overlay.desktop` 自启
+- 面板：已清空，不留任何本项目的组件
 
 ## 排查笔记
 
@@ -137,9 +138,14 @@ helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会�
   改完记得 `systemctl --user restart plasma-plasmashell.service`。
 - **不要指望 KWin 脚本里的 `callLater` 做超时**。实测它有时不触发，选择模式会永久停在选中状态。
   现在由面板组件的 Timer 做看门狗（8 秒），只要组件在跑就能收手。
+- **改 KWin 脚本要开关一次插件才算重载**。`qdbus6 org.kde.KWin /KWin reconfigure` 不会重载已重装过的脚本；
+  也不能用 `Scripting.unloadScript` + `loadScript`，那样会留下僵尸动作——旧动作还在 kglobalaccel，
+  新实例用同名注册被拒，结果动作指向已死的实例，表现就是「按了没反应，日志也没记录」。
+- **杀浮层要按 QML 路径匹配**。实际进程是 `/usr/bin/qml .../letterswitch/overlay/main.qml`，
+  按包装脚本名 pkill 匹配不到，每次重载会多留一个实例，多个浮层叠在一起。
 - **不要用 `console.*` 传诊断信息**。`console.info` 走 qDebug，默认不进 journal；
-  而报错行号在多处补丁后会指向无关行，徒劳增加排查成本。
-  组件的上报统一走 helper 的 `Note` 方法，日志落在同一个文件里。
+  面板报错行号在多处补丁后会指向无关行，徒劳增加排查成本。
+  组件的上报统一走 helper 的 `Note` 方法，日志落在同一个地方。
 
 ## 已知限制
 
@@ -162,13 +168,13 @@ moon info
 目录：
 
 ```
-core/           纯逻辑：标签分配 + 会话状态机（无外部依赖，任何后端可测）
+core/           纯逻辑：字母分配 + 会话状态机（无外部依赖，任何后端可测）
 cmd/main/       D-Bus 会话服务
 kwin/           KWin 脚本包
-package/        Plasma 字母条组件包
+overlay/        浮层（独立进程，qml6 运行）
+package/        面板字母条组件（保留，默认不安装）
 data/           自启动项
-scripts/        安装与卸载
-scripts/reload.sh 重装 + 冒烟测试（改完 QML 用它）
+scripts/        安装、重载、卸载
 ```
 
 `moondbus` 目前只解出字符串与 u32，所以整套 IPC 刻意只用字符串，两端都不解析整数。

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # 重新装载与冒烟测试。
 #
-# 存在的理由：改完组件 QML 之后，重装包、清 QML 缓存、甚至删掉面板组件再重新添加，
-# 都不足以让 plasmashell 用上新文件——它会继续跑内存里的旧代码。
-# 可靠做法只有重启 plasmashell。把这一串固定动作收在这里，别每次手敲。
+# 浮层是独立进程，改了它的 QML 只要重启这个进程就行，不必再重启 plasmashell
+# （那一步会闪面板，只有改面板组件时才需要）。
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
 
 bin="$HOME/.local/bin/letterswitch"
-plasmoid_id="org.clyzhi.letterswitch.labels"
+overlay_bin="$HOME/.local/bin/letterswitch-overlay"
+data_dir="$HOME/.local/share/letterswitch"
 kwin_id="letterswitch"
 
 say() { printf '\n=== %s ===\n' "$*"; }
@@ -27,21 +27,30 @@ say "2/6 重装 KWin 脚本"
 kpackagetool6 --type KWin/Script --remove "$kwin_id" >/dev/null 2>&1 || true
 rm -rf "$HOME/.local/share/kwin/scripts/$kwin_id"
 kpackagetool6 --type KWin/Script --install "$repo/kwin" >/dev/null
+# reconfigure 不会重载已重装过的脚本，但也不能用 Scripting.unloadScript + loadScript：
+# 那样会留下僵尸动作（旧动作仍在 kglobalaccel，新实例同名注册被拒，触发没反应）。
+# 正确做法是开关一次插件，让 KWin 自己卸载旧实例、加载新实例。
+kwriteconfig6 --file kwinrc --group Plugins --key letterswitchEnabled false
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+sleep 1
+kwriteconfig6 --file kwinrc --group Plugins --key letterswitchEnabled true
+qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+sleep 2
 
-say "3/6 重装面板组件"
-kpackagetool6 --type Plasma/Applet --remove "$plasmoid_id" >/dev/null 2>&1 || true
-rm -rf "$HOME/.local/share/plasma/plasmoids/$plasmoid_id"
-kpackagetool6 --type Plasma/Applet --install "$repo/package" >/dev/null
+say "2.5/6 确保面板上没有旧组件"
+timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$(cat "$repo/scripts/remove-panel-widget.js")" >/dev/null 2>&1 || true
 
-say "4/6 清 QML 缓存并重启 plasmashell"
-rm -rf "$HOME/.cache/plasmashell/qmlcache"
-systemctl --user restart plasma-plasmashell.service
-sleep 6
+say "3/6 更新浮层"
+mkdir -p "$data_dir/overlay"
+install -m 644 "$repo/overlay/main.qml" "$data_dir/overlay/main.qml"
+sed "s|@OVERLAY@|$data_dir/overlay/main.qml|" \
+    "$repo/overlay/letterswitch-overlay.sh" > "$overlay_bin"
+chmod 755 "$overlay_bin"
 
-say "5/6 重启 helper"
+say "4/6 重启 helper"
 pkill -x letterswitch 2>/dev/null || true
 sleep 1
+: > /tmp/letterswitch.log
 setsid nohup stdbuf -oL "$bin" >/tmp/letterswitch.log 2>&1 </dev/null &
 sleep 2
 pgrep -x letterswitch >/dev/null && echo "helper 已启动" || {
@@ -50,6 +59,21 @@ pgrep -x letterswitch >/dev/null && echo "helper 已启动" || {
     exit 1
 }
 
+say "5/6 重启浮层"
+# 实际进程是 `/usr/bin/qml .../letterswitch/overlay/main.qml`，不包含包装脚本的名字，
+# 按包装脚本名 pkill 会匹配不到，于是每次重载都多留一个实例（会多个浮层叠在一起）。
+pkill -f 'letterswitch/overlay/main.qml' 2>/dev/null || true
+sleep 1
+setsid nohup "$overlay_bin" >/dev/null 2>&1 </dev/null &
+sleep 3
+count=$(pgrep -x qml -a 2>/dev/null | grep -c 'letterswitch/overlay' || true)
+if [ "$count" -ge 1 ]; then
+    echo "浮层已启动（实例数 $count）"
+else
+    echo "浮层未起来，日志（最后 15 行）：" >&2
+    tail -15 "${XDG_STATE_HOME:-$HOME/.local/state}/letterswitch/overlay.log" 2>/dev/null >&2 || true
+fi
+
 say "6/6 冒烟测试"
 echo "初始状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-40)"
 timeout 15 qdbus6 org.kde.kglobalaccel /component/kwin \
@@ -57,13 +81,12 @@ timeout 15 qdbus6 org.kde.kglobalaccel /component/kwin \
 sleep 3
 echo "触发后状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-60)"
 echo
-echo "组件上报："
-grep '界面' /tmp/letterswitch.log | tail -3 || echo "  （没有上报，组件可能没加载）"
+echo "浮层上报："
+grep '界面' /tmp/letterswitch.log | tail -3 || echo "  （没有上报，浮层可能没起来）"
 echo
 echo "等待看门狗（8 秒）……"
 sleep 11
 echo "最终状态：$(timeout 8 qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status | cut -c1-40)"
 
 echo
-echo "完成。若状态回到 idle 且上面有 letters= 的上报，说明链路是通的。"
-echo "改 QML 后重跑本脚本即可，不必手敲重启命令。"
+echo "完成。有 overlay-selecting 上报且最后回到 idle，说明链路是通的。"
