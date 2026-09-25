@@ -156,3 +156,73 @@ test "窗口 ID 含等号时只按第一个等号切分" {
     ),
   )
 }
+
+///|
+test "sanitize_field 把制表符与换行换成空格" {
+  assert_eq(@core.sanitize_field("a\tb"), "a b")
+  assert_eq(@core.sanitize_field("a\nb"), "a b")
+  assert_eq(@core.sanitize_field("a\r\nb"), "a  b")
+}
+
+///|
+test "sanitize_field 按上限截断" {
+  assert_eq(@core.sanitize_field("abcdefg", max_len=4), "abcd")
+  // 未超过上限时原样返回
+  assert_eq(@core.sanitize_field("abc", max_len=10), "abc")
+}
+
+///|
+test "parse_tasks 解析 id 标题 应用标识" {
+  let tasks = @core.parse_tasks("id1\t标题一\tfirefox\nid2\t标题二\tkonsole")
+  debug_inspect(
+    tasks,
+    content=(
+      #|[
+      #|  { id: "id1", title: "标题一", app_id: "firefox" },
+      #|  { id: "id2", title: "标题二", app_id: "konsole" },
+      #|]
+    ),
+  )
+}
+
+///|
+test "parse_tasks 丢弃列数不足或 ID 为空的行" {
+  // 只有一列、空行、ID 为空，都应被丢弃
+  let tasks = @core.parse_tasks("只有一列\n\n\t标题但没有ID\nid4\t标题四\tvim")
+  debug_inspect(
+    tasks,
+    content=(
+      #|[{ id: "id4", title: "标题四", app_id: "vim" }]
+
+    ),
+  )
+}
+
+///|
+test "parse_tasks 允许缺少应用标识" {
+  let tasks = @core.parse_tasks("id1\t标题")
+  debug_inspect(
+    tasks,
+    content=(
+      #|[{ id: "id1", title: "标题", app_id: "" }]
+
+    ),
+  )
+}
+
+///|
+test "encode_detail 按字母顺序带出标题与应用标识" {
+  let labels = @core.assign_labels(["w1", "w2"])
+  let tasks = @core.parse_tasks("w1\t第一个窗口\tfirefox\nw2\t第二个窗口\tkonsole")
+  assert_eq(
+    @core.encode_detail(labels, tasks),
+    "A\t第一个窗口\tfirefox\nS\t第二个窗口\tkonsole",
+  )
+}
+
+///|
+test "encode_detail 找不到窗口时留空但仍占一行" {
+  let labels = @core.assign_labels(["w1", "w9"])
+  let tasks = @core.parse_tasks("w1\t存在的窗口\tfirefox")
+  assert_eq(@core.encode_detail(labels, tasks), "A\t存在的窗口\tfirefox\nS\t\t")
+}

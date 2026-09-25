@@ -1,4 +1,13 @@
 ///|
+/// 一个窗口的元信息。标题与应用标识由 KWin 侧提供，用来在界面上说明
+/// 「这个字母对应哪个窗口」。
+pub(all) struct TaskMeta {
+  id : String
+  title : String
+  app_id : String
+} derive(Debug, Eq)
+
+///|
 /// 默认字母表顺序：先主行，再上排，最后下排。
 /// 手指移动距离短，且刚好 26 个字母。
 pub let default_alphabet : String = "ASDFGHJKLQWERTYUIOPZXCVBNM"
@@ -9,6 +18,89 @@ pub(all) struct Label {
   letter : String
   window_id : String
 } derive(Debug, Eq)
+
+///|
+/// 清洗单个字段：制表符与换行会破坏行协议（`id\ttitle\tapp_id`），统一换成空格；
+/// 过长则截断，避免状态字符串无限膨胀。
+pub fn sanitize_field(text : String, max_len? : Int = 60) -> String {
+  let mut out = ""
+  let mut i = 0
+  let n = text.length()
+  while i < n && i < max_len {
+    match text.get_char(i) {
+      Some(c) => {
+        if c == '\t' || c == '\n' || c == '\r' {
+          out = out + " "
+        } else {
+          out = out + c.to_string()
+        }
+      }
+      None => ()
+    }
+    i = i + 1
+  }
+  out
+}
+
+///|
+/// 解析 KWin 传来的任务列表：每行 `id\ttitle\tapp_id`，行与行之间用换行分隔。
+/// 少于两列的行走丢弃；标题与应用标识允许为空。
+pub fn parse_tasks(text : String) -> Array[TaskMeta] {
+  let out : Array[TaskMeta] = []
+  for line in split_char(text, '\n') {
+    if line != "" {
+      let parts = split_char(line, '\t')
+      if parts.length() >= 2 {
+        let id = sanitize_field(parts[0])
+        if id != "" {
+          let title = sanitize_field(parts[1])
+          let app_id = if parts.length() >= 3 {
+            sanitize_field(parts[2])
+          } else {
+            ""
+          }
+          out.push({ id, title, app_id })
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+/// 按 ID 找窗口元信息。
+pub fn find_task(tasks : Array[TaskMeta], id : String) -> TaskMeta? {
+  for t in tasks {
+    if t.id == id {
+      return Some(t)
+    }
+  }
+  None
+}
+
+///|
+/// 编码给界面看的明细：每行 `字母\ttitle\tapp_id`，顺序与字母分配一致。
+/// 找不到对应任务时标题留空，界面仍会显示该字母。
+pub fn encode_detail(labels : Array[Label], tasks : Array[TaskMeta]) -> String {
+  let mut out = ""
+  let mut first = true
+  for label in labels {
+    if !first {
+      out = out + "\n"
+    }
+    first = false
+    out = out + label.letter + "\t"
+    match find_task(tasks, label.window_id) {
+      Some(task) => {
+        out = out + task.title + "\t" + task.app_id
+      }
+      None => {
+        out = out + "\t"
+      }
+    }
+  }
+  out
+}
 
 ///|
 /// 按任务栏顺序把字母分配给窗口。
@@ -34,7 +126,7 @@ pub fn assign_labels(
       None => break
       Some(ch) => {
         seen.push(wid)
-        out.push({ letter: ch.to_string(), window_id: wid, })
+        out.push({ letter: ch.to_string(), window_id: wid })
         slot = slot + 1
       }
     }
@@ -80,7 +172,7 @@ pub fn decode_labels(text : String) -> Array[Label] {
     match split_once(part, '=') {
       Some((letter, wid)) =>
         if letter != "" && wid != "" {
-          out.push({ letter, window_id: wid, })
+          out.push({ letter, window_id: wid })
         }
       None => ()
     }

@@ -84,11 +84,11 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     return string_reply("error:unknown-interface")
   }
   match ctx.member {
-    // 参数：窗口 ID 列表，制表符分隔，顺序即任务栏顺序。
+    // 参数：窗口列表，每行 `id\t标题\t应用标识`，顺序即字母顺序。
     // 返回：`<token>\t<字母=窗口>\t...`
     "Begin" => {
-      let windows = @core.split_char(first_arg(ctx.body), '\t')
-      let labels = session.begin(windows)
+      let tasks = @core.parse_tasks(first_arg(ctx.body))
+      let labels = session.begin_tasks(tasks)
       string_reply(session.token() + "\t" + @core.encode_labels(labels))
     }
     // 参数：`<token>:<按键>`。返回 `activate:<窗口>` / `cancel` / `ignore`。
@@ -102,8 +102,9 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     // 参数：`<token>`。返回 `cancel` / `ignore`。
     "Cancel" =>
       string_reply(describe(session.handle_cancel(first_arg(ctx.body))))
-    // 返回 `idle:<token>` 或 `selecting:<token>:<字母=窗口>...`。
-    "Status" => string_reply(session.encode())
+    // 返回快照：第一行 `idle:<token>` 或 `selecting:<token>:<字母=窗口>...`，
+    // 其余每行 `字母\ttitle\tapp_id`，界面一次查询就能把字母与窗口对应起来。
+    "Status" => string_reply(session.snapshot())
     // 界面层把自己的状态回抛给 helper，日志就能落在一个地方。
     // 依赖：面板里的 console 既不保证输出，也不保证不会抛错。
     "Note" => {

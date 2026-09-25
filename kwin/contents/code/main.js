@@ -69,15 +69,30 @@ function windowTitleOf(win) {
     return win && win.caption ? String(win.caption) : "";
 }
 
+// 应用标识：用来在界面上取图标。Wayland 上 resourceClass 是应用级标识。
+function windowAppIdOf(win) {
+    return win && win.resourceClass ? String(win.resourceClass) : "";
+}
+
+// 标题里可能有制表符或换行（行协议的分隔符），先清洗再拼装。
+function sanitizeField(text) {
+    var s = text === undefined || text === null ? "" : String(text);
+    return s.replace(/[\t\n\r]/g, " ").substring(0, 60);
+}
+
 // Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
 // 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
 function beginSelection() {
     var windows = switchableWindows();
-    var ids = [];
+    var lines = [];
     for (var i = 0; i < windows.length; i++) {
-        ids.push(windowIdOf(windows[i]));
+        var w = windows[i];
+        // 每行 id\t标题\t应用标识，顺序即字母顺序。
+        // 标题与应用标识要一起送过去，否则界面无法说明「这个字母是哪个窗口」。
+        lines.push(windowIdOf(w) + "\t" + sanitizeField(windowTitleOf(w))
+                   + "\t" + sanitizeField(windowAppIdOf(w)));
     }
-    callDBus(SERVICE, PATH, IFACE, "Begin", ids.join("\t"), function (reply) {
+    callDBus(SERVICE, PATH, IFACE, "Begin", lines.join("\n"), function (reply) {
         var text = reply ? String(reply) : "";
         var parts = text.split("\t");
         if (parts.length === 0 || parts[0] === "" || parts[0].indexOf(ERROR_PREFIX) === 0) {

@@ -161,3 +161,38 @@ test "空闲时的取消被忽略" {
   let session = @core.Session::new()
   assert_eq(session.handle_cancel("t0"), @core.Ignore)
 }
+
+///|
+test "begin_tasks 记住标题并出现在快照里" {
+  let session = @core.Session::new()
+  let tasks = @core.parse_tasks("w1\t编辑器\tkate\nw2\t浏览器\tfirefox")
+  let labels = session.begin_tasks(tasks)
+  assert_eq(labels.length(), 2)
+  assert_eq(
+    session.snapshot(),
+    "selecting:t1:A=w1\tS=w2\nA\t编辑器\tkate\nS\t浏览器\tfirefox",
+  )
+}
+
+///|
+test "只有 ID 时快照仍然只有一行" {
+  let session = @core.Session::new()
+  ignore(session.begin(["w1", "w2"]))
+  // begin 走的是无标题路径，不应多出明细行
+  assert_eq(session.snapshot(), "selecting:t1:A=w1\tS=w2")
+}
+
+///|
+test "空闲时快照只有状态行" {
+  let session = @core.Session::new()
+  assert_eq(session.snapshot(), "idle:t0")
+}
+
+///|
+test "取消后快照回到空闲且不留明细" {
+  let session = @core.Session::new()
+  let tasks = @core.parse_tasks("w1\t编辑器\tkate")
+  ignore(session.begin_tasks(tasks))
+  session.clear()
+  assert_eq(session.snapshot(), "idle:t2")
+}

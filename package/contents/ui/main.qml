@@ -67,16 +67,20 @@ PlasmoidItem {
     }
 
     function applyStatus(raw) {
-        var line = (raw || "").trim();
+        var text = (raw || "").trim();
 
         // gdbus 返回形如 ('selecting:t1:A=w1',)，取出引号内的内容。
-        var firstQuote = line.indexOf("'");
+        var firstQuote = text.indexOf("'");
         if (firstQuote >= 0) {
-            var lastQuote = line.lastIndexOf("'");
+            var lastQuote = text.lastIndexOf("'");
             if (lastQuote > firstQuote) {
-                line = line.substring(firstQuote + 1, lastQuote);
+                text = text.substring(firstQuote + 1, lastQuote);
             }
         }
+
+        // 快照可能带明细行（字母\ttitle\tapp_id）；这个组件只关心状态行。
+        var newline = text.indexOf("\n");
+        var line = newline >= 0 ? text.substring(0, newline) : text;
 
         var isSelecting = line.indexOf("selecting:") === 0;
         var isIdle = line.indexOf("idle:") === 0;

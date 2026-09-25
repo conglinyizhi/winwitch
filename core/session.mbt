@@ -30,11 +30,12 @@ pub(all) struct Session {
   mut token : String
   mut next_token : Int
   mut labels : Array[Label]
+  mut tasks : Array[TaskMeta]
 }
 
 ///|
 pub fn Session::new() -> Session {
-  { phase: Idle, token: "t0", next_token: 1, labels: [], }
+  { phase: Idle, token: "t0", next_token: 1, labels: [], tasks: [] }
 }
 
 ///|
@@ -67,6 +68,26 @@ pub fn Session::begin(
 ) -> Array[Label] {
   self.rotate_token()
   self.labels = assign_labels(windows, alphabet~)
+  // 这条路径只有 ID，没有标题；不要留下 tasks，否则快照会多出空明细行。
+  self.tasks = []
+  self.phase = Selecting
+  self.labels
+}
+
+///|
+/// 进入选择模式，同时记住窗口的标题与应用标识，供界面说明字母对应哪个窗口。
+pub fn Session::begin_tasks(
+  self : Session,
+  tasks : Array[TaskMeta],
+  alphabet? : String = default_alphabet,
+) -> Array[Label] {
+  self.rotate_token()
+  let ids : Array[String] = []
+  for t in tasks {
+    ids.push(t.id)
+  }
+  self.labels = assign_labels(ids, alphabet~)
+  self.tasks = tasks
   self.phase = Selecting
   self.labels
 }
@@ -76,6 +97,7 @@ pub fn Session::begin(
 pub fn Session::clear(self : Session) -> Unit {
   self.phase = Idle
   self.labels = []
+  self.tasks = []
   self.rotate_token()
 }
 
@@ -142,5 +164,17 @@ pub fn Session::encode(self : Session) -> String {
   match self.phase {
     Idle => "idle:" + self.token
     Selecting => "selecting:" + self.token + ":" + encode_labels(self.labels)
+  }
+}
+
+///|
+/// 给界面用的快照：第一行是状态（与 `encode` 一致），其余每行是
+/// `字母\ttitle\tapp_id`。界面只需一次查询就能把字母与窗口对应起来。
+pub fn Session::snapshot(self : Session) -> String {
+  let head = self.encode()
+  if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
+    head
+  } else {
+    head + "\n" + encode_detail(self.labels, self.tasks)
   }
 }
