@@ -58,12 +58,12 @@ uninstall: ## 卸载
 
 .PHONY: cancel
 cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
-	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
 		io.github.conglinyizhi.winwitch.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \
 	if [ -z "$$token" ] || [ "$$token" = "idle" ]; then \
 		echo "当前不在选择模式"; \
 	else \
-		timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+		timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
 			io.github.conglinyizhi.winwitch.Cancel "$$token" && echo "已撤销 $$token"; \
 	fi
 
@@ -73,8 +73,12 @@ status: ## 查看当前状态：进程、顺序源、D-Bus 状态
 	@pgrep -x winwitch -a || echo "  helper 未运行"
 	@pgrep -x qml -a | grep winwitch/overlay || echo "  浮层未运行"
 	@echo "== D-Bus =="
-	@timeout 8 qdbus6 io.github.conglinyizhi.winwitch /LetterSwitch \
+	@timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
 		io.github.conglinyizhi.winwitch.Status 2>&1 | head -1 | cut -c1-60 || echo "  查询失败"
+	@echo "== 外观配置（面板推来的值，浮层读的就是它）=="
+	@timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
+		io.github.conglinyizhi.winwitch.Status 2>&1 | grep '^@config=' \
+		|| echo "  还没有配置推过来"
 	@echo "== KWin 脚本 =="
 	@timeout 8 qdbus6 org.kde.KWin /Scripting \
 		org.kde.kwin.Scripting.isScriptLoaded winwitch 2>&1
