@@ -13,9 +13,11 @@ import org.kde.kirigami as Kirigami
 Window {
     id: overlay
 
-    // 选择模式期间要收键盘，所以窗口必须能拿焦点；不显示时它只是个隐藏窗口，
-    // 不会干扰任何东西。
-    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    // 选择模式期间要收键盘，所以窗口必须能拿焦点；不显示时它只是个隐藏窗口。
+    //
+    // 用 Qt.Tool 而不是 Qt.Window：浮层自己绝不能出现在任务栏/任务列表里，
+    // 否则它会作为一个「可切换窗口」混进来占一个字母（用户实测发现过）。
+    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
     title: "字母切窗"
 
@@ -30,8 +32,11 @@ Window {
     readonly property string selectingPrefix: "selecting:"
     readonly property string idlePrefix: "idle:"
 
-    readonly property int cardWidth: Math.round(Kirigami.Units.gridUnit * 12)
-    readonly property int cardHeight: Math.round(Kirigami.Units.gridUnit * 2.6)
+    readonly property int cardWidth: Math.round(Kirigami.Units.gridUnit * 13)
+    readonly property int cardHeight: Math.round(Kirigami.Units.gridUnit * 3.1)
+    readonly property int cardMargin: Math.round(Kirigami.Units.smallSpacing * 1.2)
+    readonly property int iconSize: cardHeight - cardMargin * 2
+    readonly property int badgeSize: Math.round(Kirigami.Units.gridUnit * 1.1)
     readonly property int cardSpacing: Math.round(Kirigami.Units.smallSpacing)
     readonly property int cardPadding: Kirigami.Units.smallSpacing * 2
 
@@ -309,42 +314,60 @@ Window {
 
                     Row {
                         anchors.fill: parent
-                        anchors.margins: Math.round(Kirigami.Units.smallSpacing * 0.75)
-                        spacing: Math.round(Kirigami.Units.smallSpacing * 0.75)
+                        anchors.margins: overlay.cardMargin
+                        spacing: overlay.cardSpacing
 
-                        // 字母
-                        Rectangle {
-                            width: card.height - Kirigami.Units.smallSpacing
-                            height: width
-                            radius: 3
-                            color: cardArea.containsMouse ? "#ffd977" : "#f5c542"
-                            border.width: 1
-                            border.color: "#8a6d1a"
+                        // 图标 + 右上角的字母徽标（徽标压在图标角上，不另占一列）
+                        Item {
+                            id: iconBox
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: card.modelData.letter
-                                color: "#1a1a1a"
-                                font.bold: true
-                                font.pixelSize: Math.round(parent.height * 0.62)
+                            width: overlay.iconSize
+                            height: overlay.iconSize
+
+                            Kirigami.Icon {
+                                anchors.fill: parent
+                                // 图标名可能是主题名，也可能是绝对路径（desktop 文件里直接写的文件），
+                                // 后者要转成 URL 才能被 Icon 加载。
+                                source: overlay.iconSource(card.modelData.iconName)
+                                fallback: "application-x-executable"
+                            }
+
+                            Rectangle {
+                                id: badge
+
+                                width: Math.max(badgeText.implicitWidth
+                                                + Kirigami.Units.smallSpacing, overlay.badgeSize)
+                                height: Math.max(badgeText.implicitHeight + 2, overlay.badgeSize)
+                                radius: 3
+                                color: cardArea.containsMouse ? "#ffd977" : "#f5c542"
+                                border.width: 1
+                                border.color: "#8a6d1a"
+
+                                // 贴图标右上角，略微外移一点，读起来像挂在角上
+                                anchors.right: parent.right
+                                anchors.rightMargin: -Math.round(width * 0.3)
+                                anchors.top: parent.top
+                                anchors.topMargin: -Math.round(height * 0.3)
+
+                                Text {
+                                    id: badgeText
+
+                                    anchors.centerIn: parent
+                                    text: card.modelData.letter
+                                    color: "#1a1a1a"
+                                    font.bold: true
+                                    font.pixelSize: Math.round(badge.height * 0.62)
+                                }
                             }
                         }
 
-                        // 图标名可能是主题名，也可能是绝对路径（desktop 文件里直接写的文件），
-                        // 后者要转成 URL 才能被 Icon 加载。
-                        Kirigami.Icon {
-                            width: card.height - Kirigami.Units.smallSpacing
-                            height: width
-                            source: overlay.iconSource(card.modelData.iconName)
-                            fallback: "application-x-executable"
-                        }
-
                         Column {
-                            width: overlay.cardWidth - card.height
-                                   - Kirigami.Units.smallSpacing * 3
+                            width: overlay.cardWidth - overlay.iconSize
+                                   - overlay.cardMargin * 2 - overlay.cardSpacing
                             anchors.verticalCenter: parent.verticalCenter
+                            spacing: 1
 
-                            // 应用名：这是「这是什么程序」，放显眼位置
+                            // 大标题：应用名，先说「这是什么程序」
                             Text {
                                 width: parent.width
                                 text: card.modelData.appName !== ""
@@ -352,19 +375,20 @@ Window {
                                       : card.modelData.title
                                 color: "#ffffff"
                                 elide: Text.ElideRight
-                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.85)
+                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.9)
                                 font.bold: true
                             }
 
-                            // 窗口标题：次要信息，缺省不占位
+                            // 小标题：窗口标题，用来区分同一应用的多个窗口
                             Text {
                                 width: parent.width
                                 visible: text !== ""
-                                text: (card.modelData.appName !== "" && card.modelData.appName !== card.modelData.title)
+                                text: (card.modelData.appName !== ""
+                                       && card.modelData.appName !== card.modelData.title)
                                       ? card.modelData.title : ""
-                                color: Qt.rgba(1, 1, 1, 0.62)
+                                color: Qt.rgba(1, 1, 1, 0.6)
                                 elide: Text.ElideRight
-                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.68)
+                                font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.7)
                             }
                         }
                     }

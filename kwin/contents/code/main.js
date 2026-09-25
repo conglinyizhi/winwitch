@@ -38,6 +38,11 @@ function readConfigString(key, fallback) {
     }
 }
 
+// 浮层自己的窗口标题，绝不能当成可切换目标。
+// 窗口类型设了 Qt.Tool，但 Wayland 下 KWin 仍会把它算进窗口列表，
+// 结果浮层自己占一个字母（用户实测发现过）。
+var OVERLAY_TITLE = "字母切窗";
+
 // 可切换窗口：普通窗口、不在任务栏隐藏、不跳过任务切换器。
 function switchableWindows() {
     var result = [];
@@ -54,6 +59,9 @@ function switchableWindows() {
             continue;
         }
         if (!w.internalId) {
+            continue;
+        }
+        if (windowTitleOf(w) === OVERLAY_TITLE) {
             continue;
         }
         result.push(w);

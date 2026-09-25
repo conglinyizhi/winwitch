@@ -25,6 +25,9 @@ PlasmoidItem {
     readonly property int displayRole: 0
 
     // 前缀常量：length 是属性不是函数，别在用的时候现取。
+    // 浮层窗口的标题：用它把自己的界面从任务列表里排除掉。
+    readonly property string overlayTitle: "字母切窗"
+
     readonly property string applicationsPrefix: "applications:"
     readonly property string preferredPrefix: "preferred://"
 
@@ -328,12 +331,20 @@ PlasmoidItem {
                 appName = root.iconFromAppId(appId);
             }
 
+            var title = asString(roleValue(r, root.displayRole));
+
+            // 跳过浮层自己的窗口：它是我们自己的界面，不是可切换的目标。
+            // （窗口类型已经设成 Qt.Tool，正常不该出现在这里；这里是第二道保险。）
+            if (title === root.overlayTitle || appName === root.overlayTitle) {
+                continue;
+            }
+
             rows.push({
                 ids: ids,
                 appId: appId,
                 appName: appName,
                 iconName: root.iconFor(appId),
-                title: asString(roleValue(r, root.displayRole))
+                title: title
             });
         }
         return rows;
