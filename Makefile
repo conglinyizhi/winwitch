@@ -61,6 +61,16 @@ flash: ## 闪测：唤醒一次浮层，1.2 秒后自动收掉（换时长：mak
 	@bash $(REPO)/scripts/flash.sh $(SEC)
 
 .PHONY: flash
+shortcut: ## 设置入口快捷键（用法：make shortcut KEYS=Meta+F）
+	@test -n "$(KEYS)" || { echo "需要 KEYS，例如 make shortcut KEYS=Meta+F"; exit 2; }
+	kwriteconfig6 --file kglobalshortcutsrc --group kwin \
+		--key "WinWitch 进入选择模式" \
+		"$(KEYS),none,显示窗口字母标签并进入选择模式"
+	qdbus6 org.kde.KWin /KWin reconfigure >/dev/null
+	@echo "入口快捷键已设为 $(KEYS)"
+	@echo "注意：这只改了生效值。脚本里的默认值在 kwinrc 的 Script-winwitch/shortcutPrefix"
+
+.PHONY: shortcut
 cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
 	@token=$$(timeout 8 qdbus6 io.github.conglinyizhi.winwitch /winwitch \
 		io.github.conglinyizhi.winwitch.Status 2>/dev/null | head -1 | sed 's/^selecting://; s/:.*//'); \
