@@ -164,6 +164,73 @@ function commitSelection() {
     });
 }
 
+// 把浮层摆到设置要求的位置。
+//
+// 为什么要在 KWin 侧做：Wayland 的顶层窗口没有「请求位置」这回事，客户端设的 x/y 会被
+// 合成器忽略（实测：设置成 top，浮层仍出现在屏幕中央）。合成器自己才能摆窗口，
+// 所以由这里读配置、算坐标、设 frameGeometry。
+function overlayTargetY(position, screenHeight, height) {
+    var margin = 64;
+    if (position === "top") {
+        return margin;
+    }
+    if (position === "center") {
+        return Math.max(0, Math.round((screenHeight - height) / 2));
+    }
+    return Math.max(0, Math.round(screenHeight - height - margin));
+}
+
+function placeOverlay(w) {
+    callDBus(SERVICE, PATH, IFACE, "Settings", function (reply) {
+        var text = reply ? String(reply) : "";
+        var position = "bottom";
+        var parts = text.split(";");
+        for (var i = 0; i < parts.length; i++) {
+            var eq = parts[i].indexOf("=");
+            if (eq > 0 && parts[i].substring(0, eq) === "position") {
+                position = parts[i].substring(eq + 1);
+            }
+        }
+
+        var geo = null;
+        try {
+            geo = w.output ? w.output.geometry : null;
+        } catch (e) {
+            geo = null;
+        }
+        if (!geo) {
+            print("winwitch: 取不到屏幕几何，跳过定位");
+            return;
+        }
+
+        var frame = w.frameGeometry;
+        var x = Math.round(geo.x + (geo.width - frame.width) / 2);
+        var y = geo.y + overlayTargetY(position, geo.height, frame.height);
+        try {
+            // 这个 KWin 里：没有 Qt 对象（Qt.rect 用不了），x/y 是只读的。
+            // 唯一可行的是给 frameGeometry 赋一个 JS 对象，marshalling 会转成 QRect。
+            w.frameGeometry = { x: x, y: y, width: frame.width, height: frame.height };
+            print("winwitch: 浮层定位 " + position + " -> " + x + "," + y);
+        } catch (e2) {
+            print("winwitch: 定位抛错 " + e2);
+        }
+    });
+}
+
+// 浮层在 Begin 之后才映射，所以被动等它出现比轮询可靠（这个 KWin 里没有定时器 API）。
+function hookOverlayPlacement() {
+    try {
+        workspace.windowAdded.connect(function (w) {
+            if (w && windowTitleOf(w) === OVERLAY_TITLE) {
+                placeOverlay(w);
+            }
+        });
+        print("winwitch: 已挂上浮层定位");
+    } catch (e) {
+        print("winwitch: 挂浮层定位失败 " + e);
+    }
+}
+
 function init() {
     var prefix = readConfigString("shortcutPrefix", "Meta+F");
 
@@ -182,6 +249,9 @@ function init() {
         "",
         commitSelection
     );
+
+    // 浮层在 Begin 之后才映射，用 windowAdded 被动等它出现
+    hookOverlayPlacement();
 
     print("winwitch: 已注册，入口 " + prefix + "，提交动作无按键");
 }

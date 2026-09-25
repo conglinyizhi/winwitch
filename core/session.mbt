@@ -282,6 +282,12 @@ pub fn Session::set_config(self : Session, text : String) -> Unit {
 }
 
 ///|
+/// 读回当前配置串。
+pub fn Session::settings(self : Session) -> String {
+  self.config
+}
+
+///|
 /// 取走待激活的窗口（取完即清）。KWin 只负责「取回来并激活」。
 pub fn Session::take_pending(self : Session) -> String? {
   if self.pending == "" {

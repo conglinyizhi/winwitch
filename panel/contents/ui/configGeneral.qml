@@ -20,6 +20,7 @@ KCM.SimpleKCM {
     property alias cfg_overlayPosition: positionBox.currentValue
     property alias cfg_maxColumns: columnsBox.value
     property alias cfg_showWindowTitle: titleBox.checked
+    property alias cfg_transparentBackground: transparentBox.checked
 
     Kirigami.FormLayout {
         QQC2.ComboBox {
@@ -38,7 +39,7 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: columnsBox
 
-            Kirigami.FormData.label: "最多几列"
+            Kirigami.FormData.label: "最多列数"
             from: 1
             to: 8
         }
@@ -48,6 +49,13 @@ KCM.SimpleKCM {
 
             Kirigami.FormData.label: "显示窗口标题"
             text: "在应用名下面显示窗口标题"
+        }
+
+        QQC2.CheckBox {
+            id: transparentBox
+
+            Kirigami.FormData.label: "背景色透明"
+            text: "去掉浮层底色，只留卡片"
         }
     }
 }

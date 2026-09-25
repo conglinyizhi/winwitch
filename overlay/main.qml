@@ -51,6 +51,7 @@ Window {
     property string positionSetting: "bottom"
     property int maxColumnsSetting: 6
     property bool showWindowTitle: true
+    property bool transparentBackground: false
 
     property int pollFailures: 0
     property bool useGdbus: false
@@ -243,6 +244,8 @@ Window {
                 }
             } else if (key === "showTitle") {
                 overlay.showWindowTitle = (value === "1");
+            } else if (key === "transparent") {
+                overlay.transparentBackground = (value === "1");
             }
         }
     }
@@ -352,11 +355,14 @@ Window {
         }
     }
 
+    // 浮层底色。开了「背景色透明」就只留卡片（卡片自己还有半透明底，仍可读）。
     Rectangle {
         anchors.fill: parent
-        radius: Kirigami.Units.smallSpacing
-        color: Qt.rgba(0.09, 0.09, 0.11, 0.94)
-        border.width: 1
+        radius: overlay.transparentBackground ? 0 : Kirigami.Units.smallSpacing
+        color: overlay.transparentBackground
+               ? "transparent"
+               : Qt.rgba(0.09, 0.09, 0.11, 0.94)
+        border.width: overlay.transparentBackground ? 0 : 1
         border.color: Qt.rgba(1, 1, 1, 0.16)
 
         Flow {

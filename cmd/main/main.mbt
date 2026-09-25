@@ -117,6 +117,9 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
       session.set_config(first_arg(ctx.body))
       string_reply("ok")
     }
+    // 读回当前配置。KWin 需要知道浮层该贴哪条边（Wayland 下客户端设的窗口坐标会被忽略，
+    // 只能由 KWin 来摆位置）。
+    "Settings" => string_reply(session.settings())
     // 取走待激活的窗口。界面选完之后触发 KWin 的「提交」动作，KWin 再来调这个。
     "TakePending" =>
       match session.take_pending() {
