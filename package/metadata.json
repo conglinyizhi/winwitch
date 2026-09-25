@@ -1,16 +1,16 @@
 {
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Name": "字母切窗 字母条 (Letter Switch Strip)",
-        "Description": "显示字母切窗当前可用的字母，点击即可切换窗口。",
+        "Name": "窗口导航器",
+        "Description": "显示窗口导航器当前可用的字母，点击即可切换窗口。",
         "Icon": "preferences-system-windows",
-        "Id": "org.clyzhi.letterswitch.labels",
+        "Id": "io.github.conglinyizhi.windownavigator.strip",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Category": "Windows and Tasks",
         "Authors": [
             {
-                "Name": "clyzhi"
+                "Name": "conglinyizhi"
             }
         ]
     },

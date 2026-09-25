@@ -1,4 +1,4 @@
-name = "clyzhi/letterswitch"
+name = "conglinyizhi/windownavigator"
 
 version = "0.1.0"
 

@@ -61,7 +61,7 @@ Use `KPackageStructure: Plasma/Applet`, Plasma API minimum `6.0`, and a QML entr
 
 ```bash
 git add package src tests README.md
-git commit -m "feat(plasmoid): 建立字母切窗基础模型"
+git commit -m "feat(plasmoid): 建立窗口导航器基础模型"
 ```
 
 ---
@@ -105,7 +105,7 @@ Expected: PASS.
 
 ```bash
 git add kwin tests
-git commit -m "feat(kwin): 增加字母切窗状态机"
+git commit -m "feat(kwin): 增加窗口导航器状态机"
 ```
 
 ---

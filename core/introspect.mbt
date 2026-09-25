@@ -8,7 +8,7 @@
 pub fn introspection_xml() -> String {
   let xml =
     #|<node>
-    #|  <interface name="org.clyzhi.LetterSwitch">
+    #|  <interface name="io.github.conglinyizhi.WindowNavigator">
     #|    <method name="Begin">
     #|      <arg name="windows" type="s" direction="in"/>
     #|      <arg name="assignment" type="s" direction="out"/>

@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "clyzhi/letterswitch/core"
+package "conglinyizhi/windownavigator/core"
 
 import {
   "moonbitlang/core/debug",

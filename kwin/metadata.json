@@ -1,15 +1,15 @@
 {
     "KPackageStructure": "KWin/Script",
     "KPlugin": {
-        "Name": "字母切窗 (Letter Switch)",
+        "Name": "窗口导航器",
         "Description": "按 Meta+F 后，用单个字母切换到对应窗口；Esc 立即取消。",
         "Icon": "preferences-system-windows",
-        "Id": "letterswitch",
+        "Id": "windownavigator",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Authors": [
             {
-                "Name": "clyzhi"
+                "Name": "conglinyizhi"
             }
         ]
     },

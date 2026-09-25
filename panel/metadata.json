@@ -1,16 +1,16 @@
 {
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Name": "字母切窗 顺序源",
-        "Description": "把任务栏的窗口顺序推给字母切窗服务，让字母按任务栏顺序分配。本组件不显示任何内容。",
+        "Name": "窗口导航器",
+        "Description": "窗口导航器的面板侧组件：提供任务栏顺序与应用元信息，并承载设置入口。",
         "Icon": "preferences-system-windows",
-        "Id": "org.clyzhi.letterswitch.order",
+        "Id": "io.github.conglinyizhi.windownavigator.panel",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",
         "Category": "Windows and Tasks",
         "Authors": [
             {
-                "Name": "clyzhi"
+                "Name": "conglinyizhi"
             }
         ]
     },

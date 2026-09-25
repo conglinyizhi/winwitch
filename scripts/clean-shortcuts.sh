@@ -16,13 +16,13 @@ rc="$HOME/.config/kglobalshortcutsrc"
 
 removed=0
 for letter in A S D F G H J K L Q W E R T Y U I O P Z X C V B N M; do
-    if grep -q "^字母切窗 ${letter}=" "$rc"; then
-        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "字母切窗 ${letter}" --delete
+    if grep -q "^窗口导航器 ${letter}=" "$rc"; then
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "窗口导航器 ${letter}" --delete
         removed=$((removed + 1))
     fi
 done
-if grep -q '^字母切窗 取消=' "$rc"; then
-    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "字母切窗 取消" --delete
+if grep -q '^窗口导航器 取消=' "$rc"; then
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "窗口导航器 取消" --delete
     removed=$((removed + 1))
 fi
 

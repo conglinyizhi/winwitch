@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Letter Switch Overlay
-Comment=字母切窗的浮层（选择模式时显示可用字母）
+Comment=窗口导航器的浮层（选择模式时显示可用字母）
 # @WRAPPER@ 由 scripts/install.sh 在安装时替换为真实路径。
 Exec=@WRAPPER@
 Icon=preferences-system-windows

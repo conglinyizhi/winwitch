@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Letter Switch Helper
-Comment=字母切窗的会话状态服务（D-Bus）
+Comment=窗口导航器的会话状态服务（D-Bus）
 # @HELPER@ 由 scripts/install.sh 在安装时替换为真实路径。
 # stdbuf 不能省：MoonBit 的 stdout 重定向到文件时是全缓冲，不加就看不到日志。
 Exec=/usr/bin/stdbuf -oL -eL @HELPER@

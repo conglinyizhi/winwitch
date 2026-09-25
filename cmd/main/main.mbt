@@ -4,13 +4,13 @@
 // 本进程不接触键盘设备，也不写任何文件。
 
 ///|
-let service_name : String = "org.clyzhi.LetterSwitch"
+let service_name : String = "io.github.conglinyizhi.WindowNavigator"
 
 ///|
-let object_path : String = "/LetterSwitch"
+let object_path : String = "/WindowNavigator"
 
 ///|
-let interface_name : String = "org.clyzhi.LetterSwitch"
+let interface_name : String = "io.github.conglinyizhi.WindowNavigator"
 
 ///|
 /// 把纯文本包成一个 `s` 类型的回复。
@@ -68,7 +68,7 @@ fn describe(action : @core.Action) -> String {
 fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
   if debug_enabled() {
     println(
-      "letterswitch: 收到调用 iface=\"\{ctx.iface}\" member=\"\{ctx.member}\" body_len=\{ctx.body.length()}",
+      "windownavigator: 收到调用 iface=\"\{ctx.iface}\" member=\"\{ctx.member}\" body_len=\{ctx.body.length()}",
     )
   }
   // 自省与 Peer 属于 D-Bus 约定的公共接口，不在我们的接口名下。
@@ -108,7 +108,7 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     // 界面层把自己的状态回抛给 helper，日志就能落在一个地方。
     // 依赖：面板里的 console 既不保证输出，也不保证不会抛错。
     "Note" => {
-      println("letterswitch[界面] \{first_arg(ctx.body)}")
+      println("windownavigator[界面] \{first_arg(ctx.body)}")
       string_reply("ok")
     }
     // 界面推来的外观配置（`键=值;键=值`）。浮层读不到面板组件的配置，
@@ -129,7 +129,7 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     "Order" => {
       let body = first_arg(ctx.body)
       if debug_enabled() {
-        println("letterswitch: 收到顺序槽位（每行：ids	应用名	图标名	标题）")
+        println("windownavigator: 收到顺序槽位（每行：ids	应用名	图标名	标题）")
         for line in @core.split_char(body, '\n') {
           if line != "" {
             println("  " + line)
@@ -148,23 +148,23 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
 fn main {
   match @dbus.Server::connect() {
     Err(code) =>
-      println("letterswitch: 无法连接会话总线，错误码 \{code}")
+      println("windownavigator: 无法连接会话总线，错误码 \{code}")
     Ok(server) => {
       match server.hello() {
         Ok(unique) =>
-          println("letterswitch: 已连接会话总线，唯一名 \{unique}")
+          println("windownavigator: 已连接会话总线，唯一名 \{unique}")
         Err(code) =>
-          println("letterswitch: Hello 握手失败，错误码 \{code}")
+          println("windownavigator: Hello 握手失败，错误码 \{code}")
       }
       match server.request_name(service_name, 0) {
-        Ok(_) => println("letterswitch: 已申请名称 \{service_name}")
+        Ok(_) => println("windownavigator: 已申请名称 \{service_name}")
         Err(code) =>
           println(
-            "letterswitch: 申请名称 \{service_name} 失败，错误码 \{code}；KWin 将无法调用本服务",
+            "windownavigator: 申请名称 \{service_name} 失败，错误码 \{code}；KWin 将无法调用本服务",
           )
       }
       let session = @core.Session::new()
-      println("letterswitch: 就绪，对象路径 \{object_path}")
+      println("windownavigator: 就绪，对象路径 \{object_path}")
       server.serve(fn(
         _server : @dbus.Server,
         ctx : @dbus.DispatchCtx,

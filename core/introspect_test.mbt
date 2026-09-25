@@ -21,5 +21,5 @@ test "自省 XML 是完整的 node 文档" {
   let xml = @core.introspection_xml()
   assert_true(xml.contains("<node>"))
   assert_true(xml.contains("</node>"))
-  assert_true(xml.contains("org.clyzhi.LetterSwitch"))
+  assert_true(xml.contains("io.github.conglinyizhi.WindowNavigator"))
 }

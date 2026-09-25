@@ -1,4 +1,4 @@
-# 字母切窗 (Letter Switch)
+# 窗口导航器
 
 KDE Plasma 6 / Wayland 下的窗口切换器。按 `Meta+F` 进入选择模式，屏幕底部浮出一排字母，
 按字母切到对应窗口，`Esc` 立即退出且不切换任何窗口。
@@ -23,7 +23,7 @@ Meta+F, Escape      取消，不切换窗口
 
 ### 设置页
 
-面板上的「字母切窗 顺序源」有一个小而淡的窗口图标，**点它就弹出设置**。目前三项：
+面板上的「窗口导航器」有一个小而淡的窗口图标，**点它就弹出设置**。目前三项：
 
 | 选项 | 说明 |
 | --- | --- |
@@ -103,9 +103,9 @@ scripts/reload.sh     # 重装 + 重启 helper/浮层 + 冒烟测试
 这个脚本不是图省事：里面几个顺序（开关插件重载 KWin 脚本、按 QML 路径杀浮层实例）
 都是踩出来的，手敲很容易漏。详见下面的排查笔记。
 
-安装脚本会：编译 helper 到 `~/.local/bin/letterswitch`，安装 KWin 脚本、
-浮层（`~/.local/share/letterswitch/overlay/`）、两个自启动项，并清掉旧的面板组件。
-之后只需确认：系统设置 → 窗口管理 → KWin 脚本，看「字母切窗」是否已勾选。
+安装脚本会：编译 helper 到 `~/.local/bin/windownavigator`，安装 KWin 脚本、
+浮层（`~/.local/share/windownavigator/overlay/`）、两个自启动项，并清掉旧的面板组件。
+之后只需确认：系统设置 → 窗口管理 → KWin 脚本，看「窗口导航器」是否已勾选。
 
 helper 的启动需要 `stdbuf -oL`（自启动项里已经写好了）：
 MoonBit 的 stdout 重定向到文件时是全缓冲，不加就看不到任何日志。
@@ -113,7 +113,7 @@ MoonBit 的 stdout 重定向到文件时是全缓冲，不加就看不到任何�
 自检：
 
 ```bash
-qdbus6 org.clyzhi.LetterSwitch /LetterSwitch org.clyzhi.LetterSwitch.Status
+qdbus6 io.github.conglinyizhi.WindowNavigator /WindowNavigator io.github.conglinyizhi.WindowNavigator.Status
 # 空闲时应输出：idle:t0
 ```
 
@@ -125,7 +125,7 @@ scripts/uninstall.sh
 
 ## D-Bus 接口
 
-服务名 `org.clyzhi.LetterSwitch`，对象路径 `/LetterSwitch`，接口同名。
+服务名 `io.github.conglinyizhi.WindowNavigator`，对象路径 `/WindowNavigator`，接口同名。
 
 | 方法 | 参数 | 返回 |
 | --- | --- | --- |
@@ -146,9 +146,9 @@ scripts/uninstall.sh
 
 ### 已在你本机实测通过
 - `core` 单元测试 37 项全绿。
-- **KWin 接受并加载了脚本**：`isScriptLoaded letterswitch` → `true`，journal 有「已注册，入口 Meta+F（组合序列）」。
+- **KWin 接受并加载了脚本**：`isScriptLoaded windownavigator` → `true`，journal 有「已注册，入口 Meta+F（组合序列）」。
 - **28 条快捷键真实注册**：`kglobalaccel` 的 kwin 组件里数得到 26 个字母 + 进入选择模式 + 取消。
-- **Meta+F 处理器全链路跑通**：主动触发「字母切窗 进入选择模式」后，KWin 枚举出真实会话的 12 个窗口，
+- **Meta+F 处理器全链路跑通**：主动触发「窗口导航器 进入选择模式」后，KWin 枚举出真实会话的 12 个窗口，
   helper 按顺序分配 `A S D F G H J K L Q W E R`，`Status` 返回 `selecting:t7:...`；再触发取消回到 `idle:t8`。
 - **三种 D-Bus 客户端都能稳定调用**：gdbus、busctl、qdbus6 各三轮均返回；连轮询 30 次无超时、无残留进程。
 - **按 `Meta+F` 确实会触发**。journal 里能数到多次「选择模式开始 token=t…」与随之的「已取消」，
@@ -164,9 +164,9 @@ scripts/uninstall.sh
 ## 本机部署状态
 
 - 仓库：`~/disk/ai_workspace/kde-winwitch`
-- helper：`~/.local/bin/letterswitch`，由 `~/.config/autostart/letterswitch-helper.desktop` 自启
-- KWin 脚本：已启用（`kwinrc` 的 `letterswitchEnabled=true`）
-- 浮层：`~/.local/share/letterswitch/overlay/main.qml`，由 `letterswitch-overlay.desktop` 自启
+- helper：`~/.local/bin/windownavigator`，由 `~/.config/autostart/windownavigator-helper.desktop` 自启
+- KWin 脚本：已启用（`kwinrc` 的 `windownavigatorEnabled=true`）
+- 浮层：`~/.local/share/windownavigator/overlay/main.qml`，由 `windownavigator-overlay.desktop` 自启
 - 面板：已清空，不留任何本项目的组件
 
 ## 排查笔记
@@ -180,7 +180,7 @@ scripts/uninstall.sh
   `kpackagetool6 --upgrade` 也认不出这个包，安装脚本因此改成先移除再安装。
 
 helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会刷满日志）：
-排障时用 `LETTERSWITCH_DEBUG=1 letterswitch` 启动。
+排障时用 `LETTERSWITCH_DEBUG=1 windownavigator` 启动。
 
 另外两个耗了不少时间的坑：
 
@@ -192,7 +192,7 @@ helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会�
 - **改 KWin 脚本要开关一次插件才算重载**。`qdbus6 org.kde.KWin /KWin reconfigure` 不会重载已重装过的脚本；
   也不能用 `Scripting.unloadScript` + `loadScript`，那样会留下僵尸动作——旧动作还在 kglobalaccel，
   新实例用同名注册被拒，结果动作指向已死的实例，表现就是「按了没反应，日志也没记录」。
-- **杀浮层要按 QML 路径匹配**。实际进程是 `/usr/bin/qml .../letterswitch/overlay/main.qml`，
+- **杀浮层要按 QML 路径匹配**。实际进程是 `/usr/bin/qml .../windownavigator/overlay/main.qml`，
   按包装脚本名 pkill 匹配不到，每次重载会多留一个实例，多个浮层叠在一起。
 - **命令是交给 shell 解释的，载荷里的 shell 元字符必须先处理**。引擎用的是
   `KProcess::setShellCommand`，所以：
@@ -208,7 +208,7 @@ helper 的逐调用日志默认关闭（面板组件会持续轮询，打开会�
 - 字母上限 26 个窗口，多余的窗口没有字母。
 - 字母映射基于「任务栏顺序」：顺序源推的顺序每秒刷新一次，若你在选择模式中拖动任务栏图标，
   字母会跟着变。
-- 面板配置里会有一项「字母切窗 顺序源」；它不显示内容，但确实占一项。
+- 面板配置里会有一项「窗口导航器」；它不显示内容，但确实占一项。
   不需要时右键移除即可（移除后字母会退回到 KWin 顺序）。
 - helper 必须常驻；未运行时浮层不显示（隐藏是安全的默认值），`Meta+F` 不会生效。
 - 未实现：多屏分组、按应用分组、虚拟桌面跨屏切换、标签颜色配置。
