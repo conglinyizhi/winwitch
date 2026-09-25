@@ -1,6 +1,7 @@
 import {
   "clyzhi/letterswitch/core",
   "conglinyizhi/moondbus/src" @dbus,
+  "moonbitlang/core/env",
 }
 
 supported_targets = "+native"

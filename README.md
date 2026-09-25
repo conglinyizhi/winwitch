@@ -75,20 +75,35 @@ scripts/uninstall.sh
 
 ## 已验证 / 未验证
 
-在开发机上实测通过（隔离的私有 session bus，未触碰真实会话）：
+### 已在你本机实测通过
 
-- `core` 单元测试 34 项全绿：字母分配、去重、封顶、大小写、`Esc` 优先、陈旧 token、超时、显式取消。
-- helper 真机跑通：`Begin` 分配 `A/S/D`，`Status` 反映状态，陈旧 token 返回 `ignore`，
-  `Key` 命中返回 `activate:w3`，`Esc` 与 `Cancel` 都只取消。
-- native 编译通过（`moon build cmd/main --target native`）。
+- `core` 单元测试 37 项全绿。
+- **KWin 接受并加载了脚本**：`isScriptLoaded letterswitch` → `true`，journal 有「已注册，入口 Meta+F（组合序列）」。
+- **28 条快捷键真实注册**：`kglobalaccel` 的 kwin 组件里数得到 26 个字母 + 进入选择模式 + 取消。
+- **Meta+F 处理器全链路跑通**：主动触发「字母切窗 进入选择模式」后，KWin 枚举出真实会话的 12 个窗口，
+  helper 按顺序分配 `A S D F G H J K L Q W E R`，`Status` 返回 `selecting:t7:...`；再触发取消回到 `idle:t8`。
+- **三种 D-Bus 客户端都能稳定调用**：gdbus、busctl、qdbus6 各三轮均返回；连轮询 30 次无超时、无残留进程。
 
-**尚未在真实 Plasma 会话中验证**，以下三点需要你在自己机器上确认，林汐没有假装它们已经成立：
+### 仍未验证
 
-1. **KWin 是否接受 `Meta+F, A` 这类多键序列**。KGlobalAccel 支持组合序列，但未在本机确认。
-   若不支持，把 KWin 脚本配置里 `useSequences` 设为 `false`，改用 `Meta+Alt+<字母>` 平铺模式。
-2. **任务栏组件是否能正常加载**。它用了 `org.kde.taskmanager` 的公开模型，
-   不同 Plasma 6 小版本的属性名可能有差异；加载失败时看 `journalctl -f -n50 | grep -i plasmoid`。
-3. **`Esc` 是否真能在选择模式内被 KWin 捕获**。这依赖 `Meta+F, Escape` 序列能否注册。
+1. **按实际的 `Meta+F, <字母>` 键序列能否触发**。快捷键已注册成功，但键序列是否被 KDE 真正派发，需你亲手按一下。
+   若无效，把 `kwin/contents/code/main.js` 里的 `useSequences` 默认值改 `false`，退到 `Meta+Alt+<字母>`。
+2. **按字母后的窗口激活那一段**。不偷你桌面焦点，所以没测；你按一次就知道。
+3. **任务栏组件在面板上的实际渲染**。包已正确安装，但尚未添加到面板。
+
+## 排查笔记
+
+两个坑，都已在代码里处理：
+
+- **Qt 客户端会先发 Introspect**。qdbus6 这类 Qt 客户端在调用方法前会请求
+  `org.freedesktop.DBus.Introspectable.Introspect` 解析签名。服务端若不回包，客户端会一直等，
+  表现为「调用挂死」而不是报错。helper 现在实现了自省回复与 `Peer.Ping`。
+- **KWin 脚本的 metadata 必须有 `KPackageStructure`**。只写已弃用的 `ServiceTypes` 时，
+  KWin 会拒收并报 `does not match requested format "KWin/Script"`，而且坏 metadata 装上后
+  `kpackagetool6 --upgrade` 也认不出这个包，安装脚本因此改成先移除再安装。
+
+helper 的逐调用日志默认关闭（任务栏会持续轮询，打开会刷满日志）：
+排障时用 `LETTERSWITCH_DEBUG=1 letterswitch` 启动。
 
 ## 已知限制
 

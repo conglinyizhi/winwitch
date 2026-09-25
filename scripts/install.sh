@@ -31,18 +31,15 @@ install -m 755 "$repo/_build/native/release/build/cmd/main/main.exe" "$bin_dir/l
 say "已安装 $bin_dir/letterswitch"
 
 say "== 2/4 安装 KWin 脚本 =="
-if kpackagetool6 --type KWin/Script --list 2>/dev/null | grep -qx 'letterswitch'; then
-    kpackagetool6 --type KWin/Script --upgrade "$repo/kwin"
-else
-    kpackagetool6 --type KWin/Script --install "$repo/kwin"
-fi
+# 先移除再安装：旧的坏 metadata（缺 KPackageStructure）会让 --upgrade 自己认不出包。
+kpackagetool6 --type KWin/Script --remove letterswitch >/dev/null 2>&1 || true
+rm -rf "$HOME/.local/share/kwin/scripts/letterswitch"
+kpackagetool6 --type KWin/Script --install "$repo/kwin"
 
 say "== 3/4 安装任务栏组件 =="
-if kpackagetool6 --type Plasma/Applet --list 2>/dev/null | grep -qx 'org.clyzhi.letterswitch.labels'; then
-    kpackagetool6 --type Plasma/Applet --upgrade "$repo/package"
-else
-    kpackagetool6 --type Plasma/Applet --install "$repo/package"
-fi
+kpackagetool6 --type Plasma/Applet --remove org.clyzhi.letterswitch.labels >/dev/null 2>&1 || true
+rm -rf "$HOME/.local/share/plasma/plasmoids/org.clyzhi.letterswitch.labels"
+kpackagetool6 --type Plasma/Applet --install "$repo/package"
 
 say "== 4/4 启用脚本与自启动 =="
 kwriteconfig6 --file kwinrc --group Plugins --key letterswitchEnabled true

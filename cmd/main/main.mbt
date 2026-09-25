@@ -21,6 +21,22 @@ fn string_reply(text : String) -> @dbus.Reply {
 }
 
 ///|
+/// 无正文、无签名的回复（用于 `org.freedesktop.DBus.Peer.Ping`）。
+fn empty_reply() -> @dbus.Reply {
+  @dbus.Reply::make(b"", "")
+}
+
+///|
+/// 逐调用日志默认关闭。任务栏组件会持续轮询，默认打开会把日志刷满；
+/// 排障时用 `LETTERSWITCH_DEBUG=1` 启动 helper 即可打开。
+fn debug_enabled() -> Bool {
+  match @env.get_env_var("LETTERSWITCH_DEBUG") {
+    Some(v) => v != "" && v != "0"
+    None => false
+  }
+}
+
+///|
 /// 读取方法调用的第一个字符串参数。
 ///
 /// moondbus 的 `read_dbus_string(body, 0)` 对单参数调用成立；带额外 header 字段的
@@ -49,9 +65,23 @@ fn describe(action : @core.Action) -> String {
 }
 
 ///|
-fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply? {
+fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
+  if debug_enabled() {
+    println(
+      "letterswitch: 收到调用 iface=\"\{ctx.iface}\" member=\"\{ctx.member}\" body_len=\{ctx.body.length()}",
+    )
+  }
+  // 自省与 Peer 属于 D-Bus 约定的公共接口，不在我们的接口名下。
+  // 特别是 Introspect：Qt 系客户端靠它解析签名，不回包会直接挂死调用。
+  if ctx.iface == "org.freedesktop.DBus.Introspectable" &&
+    ctx.member == "Introspect" {
+    return string_reply(@core.introspection_xml())
+  }
+  if ctx.iface == "org.freedesktop.DBus.Peer" && ctx.member == "Ping" {
+    return empty_reply()
+  }
   if ctx.iface != interface_name {
-    return None
+    return string_reply("error:unknown-interface")
   }
   match ctx.member {
     // 参数：窗口 ID 列表，制表符分隔，顺序即任务栏顺序。
@@ -59,7 +89,7 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply? {
     "Begin" => {
       let windows = @core.split_char(first_arg(ctx.body), '\t')
       let labels = session.begin(windows)
-      Some(string_reply(session.token() + "\t" + @core.encode_labels(labels)))
+      string_reply(session.token() + "\t" + @core.encode_labels(labels))
     }
     // 参数：`<token>:<按键>`。返回 `activate:<窗口>` / `cancel` / `ignore`。
     "Key" => {
@@ -67,14 +97,14 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply? {
         Some(pair) => pair
         None => ("", "")
       }
-      Some(string_reply(describe(session.handle_key(token, key))))
+      string_reply(describe(session.handle_key(token, key)))
     }
     // 参数：`<token>`。返回 `cancel` / `ignore`。
     "Cancel" =>
-      Some(string_reply(describe(session.handle_cancel(first_arg(ctx.body)))))
+      string_reply(describe(session.handle_cancel(first_arg(ctx.body))))
     // 返回 `idle:<token>` 或 `selecting:<token>:<字母=窗口>...`。
-    "Status" => Some(string_reply(session.encode()))
-    _ => None
+    "Status" => string_reply(session.encode())
+    _ => string_reply("error:unknown-method")
   }
 }
 
@@ -103,7 +133,7 @@ fn main {
         _server : @dbus.Server,
         ctx : @dbus.DispatchCtx,
       ) -> @dbus.Reply? {
-        dispatch(session, ctx)
+        Some(dispatch(session, ctx))
       })
     }
   }
