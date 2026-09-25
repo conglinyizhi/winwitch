@@ -20,7 +20,7 @@ KCM.SimpleKCM {
     property alias cfg_overlayPosition: positionBox.currentValue
     property alias cfg_maxColumns: columnsBox.value
     property alias cfg_showWindowTitle: titleBox.checked
-    property alias cfg_transparentBackground: transparentBox.checked
+    property alias cfg_backgroundStyle: styleBox.currentValue
 
     Kirigami.FormLayout {
         QQC2.ComboBox {
@@ -51,11 +51,16 @@ KCM.SimpleKCM {
             text: "在应用名下面显示窗口标题"
         }
 
-        QQC2.CheckBox {
-            id: transparentBox
+        QQC2.ComboBox {
+            id: styleBox
 
-            Kirigami.FormData.label: "背景色透明"
-            text: "去掉浮层底色，只留卡片"
+            Kirigami.FormData.label: "背景风格"
+            textRole: "text"
+            valueRole: "value"
+            model: [
+                { value: "translucent", text: "半透明（能透出桌面）" },
+                { value: "opaque", text: "完全不透明" }
+            ]
         }
     }
 }

@@ -51,7 +51,17 @@ Window {
     property string positionSetting: "bottom"
     property int maxColumnsSetting: 6
     property bool showWindowTitle: true
-    property bool transparentBackground: false
+    // 背景风格：translucent=半透明 / opaque=完全不透明
+    property string backgroundStyle: "translucent"
+    // 调试模式：置底、不抢焦点、右下角标「调试模式」（KWin 的调试入口开的）
+    property bool debugMode: false
+
+    readonly property bool styleOpaque: overlay.backgroundStyle === "opaque"
+    // 半透明的 alpha 特意压到 0.75：原来 0.94 与「完全不透明」的 1.0 肉眼几乎没差别，
+    // 切成不透明时看起来就像「设置没反应」。
+    readonly property color shellColor: Qt.rgba(0.09, 0.09, 0.11, overlay.styleOpaque ? 1.0 : 0.75)
+    readonly property color cardColor: Qt.rgba(1, 1, 1, 0.06)
+    readonly property color cardHoverColor: Qt.rgba(1, 1, 1, 0.14)
 
     property int pollFailures: 0
     property bool useGdbus: false
@@ -74,8 +84,9 @@ Window {
     }
 
     // 进入选择模式时抢焦点收键盘；退出时窗口隐藏，焦点自然还回去。
+    // 调试模式不抢：那是排障用的浮层，不该把键盘从用户手里夺走。
     onSelectingChanged: {
-        if (overlay.selecting) {
+        if (overlay.selecting && !overlay.debugMode) {
             overlay.requestActivate();
             keyCatcher.forceActiveFocus();
         }
@@ -244,8 +255,10 @@ Window {
                 }
             } else if (key === "showTitle") {
                 overlay.showWindowTitle = (value === "1");
-            } else if (key === "transparent") {
-                overlay.transparentBackground = (value === "1");
+            } else if (key === "bg") {
+                overlay.backgroundStyle = (value === "opaque") ? "opaque" : "translucent";
+            } else if (key === "debug") {
+                overlay.debugMode = (value === "1");
             }
         }
     }
@@ -355,14 +368,12 @@ Window {
         }
     }
 
-    // 浮层底色。开了「背景色透明」就只留卡片（卡片自己还有半透明底，仍可读）。
+    // 浮层底色：半透明时底下的桌面能透上来，不透明时完全挡住。
     Rectangle {
         anchors.fill: parent
-        radius: overlay.transparentBackground ? 0 : Kirigami.Units.smallSpacing
-        color: overlay.transparentBackground
-               ? "transparent"
-               : Qt.rgba(0.09, 0.09, 0.11, 0.94)
-        border.width: overlay.transparentBackground ? 0 : 1
+        radius: Kirigami.Units.smallSpacing
+        color: overlay.shellColor
+        border.width: 1
         border.color: Qt.rgba(1, 1, 1, 0.16)
 
         Flow {
@@ -384,9 +395,7 @@ Window {
                     width: overlay.cardWidth
                     height: overlay.cardHeight
                     radius: 4
-                    color: cardArea.containsMouse
-                           ? Qt.rgba(1, 1, 1, 0.14)
-                           : Qt.rgba(1, 1, 1, 0.06)
+                    color: cardArea.containsMouse ? overlay.cardHoverColor : overlay.cardColor
 
                     Row {
                         anchors.fill: parent
@@ -479,6 +488,27 @@ Window {
                     }
                 }
             }
+        }
+    }
+
+    // 调试模式角标：提醒这个浮层是排障用的，不是正常界面。
+    Rectangle {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: Kirigami.Units.smallSpacing
+        width: debugLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
+        height: debugLabel.implicitHeight + Kirigami.Units.smallSpacing
+        radius: 3
+        color: Qt.rgba(0.45, 0.12, 0.12, 0.85)
+        visible: overlay.debugMode
+
+        Text {
+            id: debugLabel
+
+            anchors.centerIn: parent
+            text: "调试模式"
+            color: "#ffffff"
+            font.pixelSize: Math.round(Kirigami.Units.gridUnit * 0.8)
         }
     }
 }

@@ -258,7 +258,9 @@ test "首选顺序在下次开始时自动生效" {
 test "启动器位置会空掉一个字母，保证后面与图标对齐" {
   let session = @core.Session::new()
   // 任务栏：两个常驻图标在前，然后是 w1、w2
-  let slots = @core.parse_slots("\t启动器A\tapp-a\t\n\t启动器B\tapp-b\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t")
+  let slots = @core.parse_slots(
+    "\t启动器A\tapp-a\t\n\t启动器B\tapp-b\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t",
+  )
   ignore(session.begin(["w1", "w2"]))
   ignore(session.set_slots(slots))
   let labels = session.labels()
@@ -275,13 +277,18 @@ test "快照带出应用名与图标名" {
   let slots = @core.parse_slots("w1\t飞书\tfeishu\t飞书聊天窗口")
   ignore(session.begin_tasks(@core.parse_tasks("w1\t窗口标题\tFeishu")))
   ignore(session.set_slots(slots))
-  assert_eq(session.snapshot(), "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题")
+  assert_eq(
+    session.snapshot(),
+    "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题",
+  )
 }
 
 ///|
 test "分组图标里的多个窗口连续占字母" {
   let session = @core.Session::new()
-  let slots = @core.parse_slots("w1,w2\t编辑器\tkate\t\nw3\t浏览器\tfirefox\t")
+  let slots = @core.parse_slots(
+    "w1,w2\t编辑器\tkate\t\nw3\t浏览器\tfirefox\t",
+  )
   ignore(session.begin(["w1", "w2", "w3"]))
   ignore(session.set_slots(slots))
   let labels = session.labels()

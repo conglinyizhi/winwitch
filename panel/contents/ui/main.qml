@@ -400,19 +400,19 @@ PlasmoidItem {
         var columns = 6;
         var showTitle = true;
         // 注意别叫 transparent：那是 QML 内置的颜色常量，会撞名
-        var transparentBg = false;
+        var backgroundStyle = "translucent";
         try {
             position = String(plasmoid.configuration.overlayPosition);
             columns = Number(plasmoid.configuration.maxColumns);
             showTitle = Boolean(plasmoid.configuration.showWindowTitle);
-            transparentBg = Boolean(plasmoid.configuration.transparentBackground);
+            backgroundStyle = String(plasmoid.configuration.backgroundStyle);
         } catch (e) {
             // 配置没读到就用默认值，不影响主流程
         }
         var text = "position=" + position
                  + ";columns=" + columns
                  + ";showTitle=" + (showTitle ? "1" : "0")
-                 + ";transparent=" + (transparentBg ? "1" : "0");
+                 + ";bg=" + backgroundStyle;
         // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
         configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "

@@ -35,6 +35,10 @@ pub fn introspection_xml() -> String {
     #|    <method name="Settings">
     #|      <arg name="settings" type="s" direction="out"/>
     #|    </method>
+    #|    <method name="SetDebug">
+    #|      <arg name="debug" type="s" direction="in"/>
+    #|      <arg name="result" type="s" direction="out"/>
+    #|    </method>
     #|    <method name="TakePending">
     #|      <arg name="window_id" type="s" direction="out"/>
     #|    </method>
@@ -59,5 +63,8 @@ pub fn introspection_xml() -> String {
 ///|
 /// 服务对外暴露的方法名。自省 XML 与分发逻辑都以此为准，避免两边写岔。
 pub fn method_names() -> Array[String] {
-  ["Begin", "Key", "Cancel", "Status", "Note", "Order", "TakePending", "Config", "Settings"]
+  [
+    "Begin", "Key", "Cancel", "Status", "Note", "Order", "TakePending", "Config",
+    "Settings", "SetDebug",
+  ]
 }

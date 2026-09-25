@@ -19,9 +19,9 @@
         <entry name="showWindowTitle" type="Bool">
             <default>true</default>
         </entry>
-        <!-- 浮层背景是否透明（只留卡片） -->
-        <entry name="transparentBackground" type="Bool">
-            <default>false</default>
+        <!-- 浮层背景风格：translucent（半透明） / opaque（完全不透明） -->
+        <entry name="backgroundStyle" type="String">
+            <default>translucent</default>
         </entry>
     </group>
 </kcfg>

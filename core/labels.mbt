@@ -28,13 +28,12 @@ pub fn sanitize_field(text : String, max_len? : Int = 60) -> String {
   let n = text.length()
   while i < n && i < max_len {
     match text.get_char(i) {
-      Some(c) => {
+      Some(c) =>
         if c == '\t' || c == '\n' || c == '\r' {
           out = out + " "
         } else {
           out = out + c.to_string()
         }
-      }
       None => ()
     }
     i = i + 1
@@ -59,7 +58,7 @@ pub fn parse_tasks(text : String) -> Array[TaskMeta] {
           } else {
             ""
           }
-          out.push({ id, title, app_id })
+          out.push({ id, title, app_id, })
         }
       }
     }
@@ -91,12 +90,8 @@ pub fn encode_detail(labels : Array[Label], tasks : Array[TaskMeta]) -> String {
     first = false
     out = out + label.letter + "\t"
     match find_task(tasks, label.window_id) {
-      Some(task) => {
-        out = out + task.title + "\t" + task.app_id
-      }
-      None => {
-        out = out + "\t"
-      }
+      Some(task) => out = out + task.title + "\t" + task.app_id
+      None => out = out + "\t"
     }
   }
   out
@@ -126,7 +121,7 @@ pub fn assign_labels(
       None => break
       Some(ch) => {
         seen.push(wid)
-        out.push({ letter: ch.to_string(), window_id: wid })
+        out.push({ letter: ch.to_string(), window_id: wid, })
         slot = slot + 1
       }
     }
@@ -172,7 +167,7 @@ pub fn decode_labels(text : String) -> Array[Label] {
     match split_once(part, '=') {
       Some((letter, wid)) =>
         if letter != "" && wid != "" {
-          out.push({ letter, window_id: wid })
+          out.push({ letter, window_id: wid, })
         }
       None => ()
     }
@@ -273,8 +268,12 @@ pub fn parse_slots(text : String) -> Array[Slot] {
       } else {
         ""
       }
-      let title = if parts.length() >= 4 { sanitize_field(parts[3]) } else { "" }
-      out.push({ ids, app_name, icon_name, title })
+      let title = if parts.length() >= 4 {
+        sanitize_field(parts[3])
+      } else {
+        ""
+      }
+      out.push({ ids, app_name, icon_name, title, })
     }
   }
   out
@@ -297,7 +296,14 @@ pub fn encode_slots(slots : Array[Slot]) -> String {
       }
       ids = ids + slot.ids[i]
     }
-    out = out + ids + "\t" + slot.app_name + "\t" + slot.icon_name + "\t" + slot.title
+    out = out +
+      ids +
+      "\t" +
+      slot.app_name +
+      "\t" +
+      slot.icon_name +
+      "\t" +
+      slot.title
   }
   out
 }
