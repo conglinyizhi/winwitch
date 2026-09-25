@@ -55,9 +55,9 @@ Window {
     property string backgroundStyle: "translucent"
 
     readonly property bool styleOpaque: overlay.backgroundStyle === "opaque"
-    // 半透明的 alpha 特意压到 0.75：原来 0.94 与「完全不透明」的 1.0 肉眼几乎没差别，
-    // 切成不透明时看起来就像「设置没反应」。
-    readonly property color shellColor: Qt.rgba(0.09, 0.09, 0.11, overlay.styleOpaque ? 1.0 : 0.75)
+    // 半透明的 alpha 压到 0.45：0.94、0.75 这两档都和「完全不透明」的 1.0 肉眼分不出来，
+    // 切换时看起来就像「设置没反应」（提督反馈过两次）。要的是看一眼就知道透不透。
+    readonly property color shellColor: Qt.rgba(0.09, 0.09, 0.11, overlay.styleOpaque ? 1.0 : 0.45)
     readonly property color cardColor: Qt.rgba(1, 1, 1, 0.06)
     readonly property color cardHoverColor: Qt.rgba(1, 1, 1, 0.14)
 
