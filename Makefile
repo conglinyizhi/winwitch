@@ -72,7 +72,10 @@ cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
 	fi
 
 .PHONY: status
-status: ## 查看当前状态：进程、顺序源、D-Bus 状态
+status: ## 查看当前状态：构建标识、进程、顺序源、D-Bus 状态
+	@echo "== 这份构建是谁 =="
+	@cat "$$HOME/.local/share/winwitch/build-info.txt" 2>/dev/null \
+		|| echo "  还没有标识文件（跑一次 make install）"
 	@echo "== 进程 =="
 	@pgrep -x winwitch -a || echo "  helper 未运行"
 	@pgrep -x qml -a | grep winwitch/overlay || echo "  浮层未运行"

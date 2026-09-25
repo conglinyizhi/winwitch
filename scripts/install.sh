@@ -95,6 +95,8 @@ python3 "$repo/scripts/prune-panel-keys.py" \
     "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" \
     "$repo/panel/contents/config/main.xml" --apply >/dev/null || true
 systemctl --user restart plasma-plasmashell.service
+# 记下「这次装的是哪一份构建」，供 make status 对号
+bash "$repo/scripts/gen-build-info.sh" >/dev/null
 sleep 6
 if timeout 15 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
         "$(cat "$repo/scripts/ensure-panel.js")" >/dev/null 2>&1; then
