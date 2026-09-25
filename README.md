@@ -36,6 +36,11 @@ Meta+F, Escape      取消，不切换窗口
 
 两个细节，都是踩出来的：
 
+- **固定应用（常驻图标）必须占一个字母位，而且得自己拼进顺序里**。
+  任务栏把它们放在最前面，但公开的任务模型**没有 `launchers` 属性**
+  （实测 `tasks.launchers === undefined`，和 `filterByCurrentDesktop` 一样被裁掉了），
+  所以顺序源改为读任务栏配置的 `launchers=`，逐项占位并对上在跑的窗口；
+  `preferred://filemanager` 这类符号名用 `xdg-mime query default inode/directory` 解析。
 - **启动器图标（常驻应用）必须占一个字母位**。它们没有窗口，若直接跳过，
   后面所有字母都会相对图标前移一位——用户看到的就是「顺序不完全一致」。
   现在会为它们空掉一个字母。

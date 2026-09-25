@@ -3,13 +3,15 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.taskmanager as TaskManager
 
-// 顺序源：把任务栏的图标顺序、应用名、图标名推给字母切窗服务。
+// 顺序源：把任务栏的图标顺序（含固定应用）、应用名、图标名推给字母切窗服务。
 //
 // 为什么必须有它：
-//   1. KWin 枚举窗口的顺序与任务栏图标顺序**不一致**（实测任务栏第 0 位是飞书，
+//   1. KWin 枚举窗口的顺序与任务栏图标顺序**不一致**（实测任务栏第 0 位是固定应用，
 //      KWin 第 0 位是 Kate），只靠 KWin 无法让「A = 任务栏第一个图标」成立；
-//   2. 应用名与图标名要从任务模型取才准（KWin 只给 window class，取不到图标）；
-//   3. 独立进程读不了任务模型——一实例化 TasksModel 就加载失败。
+//   2. **固定应用（常驻图标）必须占位**。它们在任务栏最前面，若不给它们留位置，
+//      后面所有字母都会相对图标整体前移；
+//   3. 应用名与图标名要从任务模型/desktop 文件取才准；
+//   4. 独立进程读不了任务模型（一实例化 TasksModel 就加载失败），只有面板组件能读。
 //
 // 本组件不绘制任何内容（零尺寸），只做这一件事。
 PlasmoidItem {
@@ -19,12 +21,18 @@ PlasmoidItem {
     readonly property int winIdListRole: TaskManager.AbstractTasksModel.WinIdList
 
     // 展示文本用 Qt::DisplayRole。
-    // 不用 Qt::DecorationRole：它返回的是 QIcon 对象，转成字符串就是 "QIcon()"，
-    // 取不到图标名。图标名改从应用标识推（feishu.desktop → feishu）。
+    // 不用 Qt::DecorationRole：它返回 QIcon 对象，转成字符串就是 "QIcon()"。
     readonly property int displayRole: 0
 
     // 前缀常量：length 是属性不是函数，别在用的时候现取。
     readonly property string applicationsPrefix: "applications:"
+    readonly property string preferredPrefix: "preferred://"
+
+    // 任务栏配置里的固定应用列表（原样保留顺序）。
+    property var launchers: []
+    // preferred://X → 解析出的应用标识（异步查一次，缓存）
+    property var preferredResolved: ({})
+    property var pendingPreferred: ({})
 
     // 图标名缓存：应用标识 → 图标名/路径。
     // 为什么不直接猜：应用标识与图标名往往不一样（org.kde.kate 的图标叫 kate），
@@ -45,26 +53,13 @@ PlasmoidItem {
     }
 
     P5Support.DataSource {
-        id: iconSource
+        id: noteSource
 
         engine: "executable"
         connectedSources: []
 
-        onNewData: function (sourceName, data) {
-            var appId = root.pendingIcons[sourceName];
-            iconSource.disconnectSource(sourceName);
-            if (appId === undefined) {
-                return;
-            }
-            delete root.pendingIcons[sourceName];
-            var out = data && data["stdout"] ? String(data["stdout"]) : "";
-            var icon = out.trim();
-            if (icon.indexOf("\n") >= 0) {
-                icon = icon.split("\n")[0].trim();
-            }
-            if (icon !== "") {
-                root.iconCache[appId] = icon;
-            }
+        onNewData: function (sourceName) {
+            noteSource.disconnectSource(sourceName);
         }
     }
 
@@ -72,9 +67,14 @@ PlasmoidItem {
         id: tasks
     }
 
-    // 命令是交给 shell 解释的（引擎用的是 KProcess::setShellCommand），
-    // 所以载荷要整体加双引号并转义。踩过的坑：不加引号的 `|` 会被当管道，
-    // 整段文本被静默截断。
+    // 上报不去重：诊断信息必须能在清空日志之后再看到。
+    function report(tag) {
+        noteSource.connectSource("qdbus6 org.clyzhi.LetterSwitch /LetterSwitch "
+                                 + "org.clyzhi.LetterSwitch.Note order-source-" + tag);
+    }
+
+    // 命令是交给 shell 解释的（引擎用 KProcess::setShellCommand），
+    // 所以载荷要整体加双引号并转义。踩过的坑：不加引号的 `|` 被当管道，整段文本被截断。
     function shellQuote(text) {
         var backslash = String.fromCharCode(92);
         var dquote = String.fromCharCode(34);
@@ -114,14 +114,6 @@ PlasmoidItem {
         }
     }
 
-    function appNameRole() {
-        try {
-            return TaskManager.AbstractTasksModel.AppName;
-        } catch (e) {
-            return -1;
-        }
-    }
-
     function appIdRole() {
         try {
             return TaskManager.AbstractTasksModel.AppId;
@@ -130,30 +122,12 @@ PlasmoidItem {
         }
     }
 
-    // 应用图标名：由应用自己声明（desktop 文件的 Icon=），比从标识猜准得多。
-    // 很多应用的图标并不叫 feishu / code，直接按标识找是找不到的。
-    function appIconRole() {
+    function appNameRole() {
         try {
-            return TaskManager.AbstractTasksModel.AppIconName;
+            return TaskManager.AbstractTasksModel.AppName;
         } catch (e) {
             return -1;
         }
-    }
-
-    // 从应用标识（feishu.desktop / org.kde.dolphin）推图标名。
-    function iconFromAppId(appId) {
-        var name = String(appId);
-        if (name.indexOf(root.applicationsPrefix) === 0) {
-            name = name.substring(root.applicationsPrefix.length);
-        }
-        var slash = name.lastIndexOf("/");
-        if (slash >= 0) {
-            name = name.substring(slash + 1);
-        }
-        if (name.length > 8 && name.substring(name.length - 8) === ".desktop") {
-            name = name.substring(0, name.length - 8);
-        }
-        return name;
     }
 
     // 应用标识里只保留安全字符，避免拼进命令时被注入。
@@ -172,6 +146,22 @@ PlasmoidItem {
             }
         }
         return out;
+    }
+
+    // 从应用标识推图标名（兜底用）。
+    function iconFromAppId(appId) {
+        var name = String(appId);
+        if (name.indexOf(root.applicationsPrefix) === 0) {
+            name = name.substring(root.applicationsPrefix.length);
+        }
+        var slash = name.lastIndexOf("/");
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+        if (name.length > 8 && name.substring(name.length - 8) === ".desktop") {
+            name = name.substring(0, name.length - 8);
+        }
+        return name;
     }
 
     // 取应用图标名：优先缓存；没有则发一次性查询，本轮回退到按标识推的名字。
@@ -195,10 +185,127 @@ PlasmoidItem {
         return root.iconFromAppId(appId);
     }
 
-    // 每行一个位置：`<ids 逗号分隔>\t应用名\t图标名\t标题`。
-    // 启动器行 ids 为空，但依然占位——helper 会为它空掉一个字母。
-    function collectSlots() {
-        var lines = [];
+    P5Support.DataSource {
+        id: iconSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            var appId = root.pendingIcons[sourceName];
+            iconSource.disconnectSource(sourceName);
+            if (appId === undefined) {
+                return;
+            }
+            delete root.pendingIcons[sourceName];
+            var out = data && data["stdout"] ? String(data["stdout"]) : "";
+            var icon = out.trim();
+            if (icon.indexOf("\n") >= 0) {
+                icon = icon.split("\n")[0].trim();
+            }
+            if (icon !== "") {
+                root.iconCache[appId] = icon;
+            }
+        }
+    }
+
+    P5Support.DataSource {
+        id: launcherSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            launcherSource.disconnectSource(sourceName);
+            var out = data && data["stdout"] ? String(data["stdout"]).trim() : "";
+            if (out === "") {
+                root.report("launchers-empty");
+                return;
+            }
+            var first = out.indexOf("\n") >= 0 ? out.split("\n")[0].trim() : out;
+            var list = [];
+            var parts = first.split(",");
+            for (var i = 0; i < parts.length; i++) {
+                var item = parts[i].trim();
+                if (item !== "") {
+                    list.push(item);
+                }
+            }
+            if (list.length > 0) {
+                root.launchers = list;
+                root.report("launchers-read-" + list.length);
+            }
+        }
+    }
+
+    P5Support.DataSource {
+        id: preferredSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            var entry = root.pendingPreferred[sourceName];
+            preferredSource.disconnectSource(sourceName);
+            if (entry === undefined) {
+                return;
+            }
+            delete root.pendingPreferred[sourceName];
+            var out = data && data["stdout"] ? String(data["stdout"]).trim() : "";
+            if (out !== "") {
+                root.preferredResolved[entry] = out.split("\n")[0].trim();
+                root.report("preferred-resolved");
+            }
+        }
+    }
+
+    // 从任务栏组件自己的配置里读固定应用列表（取第一个 launchers= 行）。
+    function fetchLaunchers() {
+        launcherSource.connectSource("sed -n s/^launchers=//p "
+                                     + "\"$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc\""
+                                     + " | head -1");
+    }
+
+    // preferred://X 是符号名，要解析成实际的应用标识才能与在跑窗口对上。
+    function resolvePreferred(entry) {
+        if (root.preferredResolved[entry] !== undefined || root.pendingPreferred[entry] !== undefined) {
+            return;
+        }
+        var cmd = "";
+        if (entry === root.preferredPrefix + "filemanager") {
+            cmd = "xdg-mime query default inode/directory";
+        } else if (entry === root.preferredPrefix + "browser") {
+            cmd = "xdg-settings get default-web-browser";
+        } else {
+            // 其它符号名暂不解析；该位置会当成空位处理
+            root.preferredResolved[entry] = "";
+            return;
+        }
+        root.pendingPreferred[entry] = true;
+        root.pendingPreferred[cmd] = entry;
+        preferredSource.connectSource(cmd);
+    }
+
+    // 一个固定项对应哪些应用标识（小写，含 .desktop）。
+    function appIdsForLauncher(entry) {
+        var text = String(entry);
+        if (text.indexOf(root.applicationsPrefix) === 0) {
+            return [text.substring(root.applicationsPrefix.length).toLowerCase()];
+        }
+        if (text.indexOf(root.preferredPrefix) === 0) {
+            var resolved = root.preferredResolved[text];
+            if (resolved === undefined || resolved === "") {
+                root.resolvePreferred(text);
+                return [];
+            }
+            return [String(resolved).toLowerCase()];
+        }
+        return [];
+    }
+
+    // 逐行读任务模型，得到 {ids, appId, appName, iconName, title}。
+    function collectRows() {
+        var rows = [];
         var count = tasks.count;
         for (var r = 0; r < count; r++) {
             var ids = [];
@@ -221,21 +328,92 @@ PlasmoidItem {
                 appName = root.iconFromAppId(appId);
             }
 
-            var iconName = root.iconFor(appId);
-
-            var title = asString(roleValue(r, root.displayRole));
-
-            lines.push(ids.join(",") + "\t" + appName + "\t" + iconName + "\t" + title);
+            rows.push({
+                ids: ids,
+                appId: appId,
+                appName: appName,
+                iconName: root.iconFor(appId),
+                title: asString(roleValue(r, root.displayRole))
+            });
         }
-        return lines.join("\n");
+        return rows;
+    }
+
+    // 把模型行整理成任务栏位置。
+    //
+    // 任务栏把固定应用放在最前面，而公开的任务模型**没有 launchers 属性**
+    // （实测 tasks.launchers === undefined，和 filterByCurrentDesktop 一样被裁掉了），
+    // 所以这里自己拼：先按配置里的固定列表逐项占位（在跑的对上窗口，没在跑的留空位），
+    // 剩下的窗口再按模型顺序补在后面。
+    function buildSlots() {
+        var rows = root.collectRows();
+        var used = [];
+        for (var i = 0; i < rows.length; i++) {
+            used.push(false);
+        }
+
+        var ordered = [];
+        for (var l = 0; l < root.launchers.length; l++) {
+            var wantIds = root.appIdsForLauncher(root.launchers[l]);
+            var slotIds = [];
+            for (var w = 0; w < wantIds.length; w++) {
+                for (var r = 0; r < rows.length; r++) {
+                    if (!used[r] && rows[r].appId.toLowerCase() === wantIds[w]) {
+                        used[r] = true;
+                        for (var k = 0; k < rows[r].ids.length; k++) {
+                            slotIds.push(rows[r].ids[k]);
+                        }
+                    }
+                }
+            }
+            ordered.push(slotIds);
+        }
+
+        for (var j = 0; j < rows.length; j++) {
+            if (!used[j]) {
+                ordered.push(rows[j].ids);
+            }
+        }
+
+        var lines = [];
+        for (var s = 0; s < ordered.length; s++) {
+            lines.push(ordered[s].join(",") + "\t\t\t");
+        }
+        return { lines: lines, rows: rows };
     }
 
     // 每次都推，不做「内容没变就跳过」的去重。
     // 踩过的坑：helper 重启后之前推过的顺序就丢了，而面板以为自己推过了，
-    // 于是永远不再推，字母退回 KWin 顺序（与任务栏对不上）。
-    // 每秒一次调用不算什么（Status 轮询本来就是每秒四次）。
+    // 于是永远不再推，字母静默退回 KWin 顺序（与任务栏对不上）。
     function pushOrder() {
-        var payload = root.collectSlots();
+        var built = root.buildSlots();
+        var rows = built.rows;
+        var lines = built.lines;
+
+        // 把应用名/图标名/标题贴到对应位置上
+        for (var i = 0; i < lines.length; i++) {
+            var head = lines[i].split("\t")[0];
+            if (head === "") {
+                continue;
+            }
+            var firstId = head.split(",")[0];
+            for (var r = 0; r < rows.length; r++) {
+                var hit = false;
+                for (var k = 0; k < rows[r].ids.length; k++) {
+                    if (rows[r].ids[k] === firstId) {
+                        hit = true;
+                        break;
+                    }
+                }
+                if (hit) {
+                    lines[i] = head + "\t" + rows[r].appName + "\t"
+                             + rows[r].iconName + "\t" + rows[r].title;
+                    break;
+                }
+            }
+        }
+
+        var payload = lines.join("\n");
         if (payload === "") {
             return;
         }
@@ -250,7 +428,18 @@ PlasmoidItem {
         onTriggered: root.pushOrder()
     }
 
-    Component.onCompleted: root.pushOrder()
+    // 固定应用列表会变（用户拖进拖出），定期重读。
+    Timer {
+        interval: 5000
+        running: true
+        repeat: true
+        onTriggered: root.fetchLaunchers()
+    }
+
+    Component.onCompleted: {
+        root.fetchLaunchers();
+        root.pushOrder();
+    }
 
     compactRepresentation: Item {
         implicitWidth: 0
