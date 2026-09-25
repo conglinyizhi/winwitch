@@ -40,7 +40,8 @@ fi
 note "3. QML 里的 console.* 调用"
 # 面板环境里 console.info 走 qDebug，默认不进 journal；console.warn 的行号
 # 在多处补丁后会指向无关行。诊断信息应走 helper 的 Note 方法。
-if grep -rn 'console\.' --include='*.qml' . >/tmp/ls-lint-console.txt; then
+# 例外：scripts/ 下的检查脚本是一次性命令行程序，输出本来就该走 console。
+if grep -rn 'console\.' --include='*.qml' --exclude-dir=scripts . >/tmp/ls-lint-console.txt; then
     while IFS= read -r line; do
         bad "$line"
     done < /tmp/ls-lint-console.txt
@@ -124,6 +125,17 @@ for pair in \
 done
 if [ -n "$stale" ]; then
     note "  注意：已安装版本与仓库不一致（跑 make install 再验证）:$stale"
+fi
+
+if command -v qmllint >/dev/null 2>&1 && [ -x /usr/lib/qt6/bin/qml ]; then
+    # 冒烟：设置页能不能加载、cfg_ 属性在不在。注意它复现不了 KCM 的真实初始化
+    # 顺序（见脚本头部的能力边界），设置页最终仍需人工点一次。
+    if QT_QPA_PLATFORM=offscreen timeout 25 /usr/lib/qt6/bin/qml \
+            scripts/check-settings-page.qml >/dev/null 2>&1; then
+        note "  设置页冒烟通过（不代替人工确认）"
+    else
+        bad "设置页冒烟失败（加载不了或 cfg_ 属性缺失）"
+    fi
 fi
 
 note "6. MoonBit"

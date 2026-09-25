@@ -23,11 +23,19 @@ KCM.SimpleKCM {
 
     title: "外观"
 
+    // 配置读取入口。脱离 Plasma 单独加载（检查脚本会这么干）时退化成空对象，
+    // 所以这里用 typeof 判断而不是直接引用，避免 ReferenceError。
+    readonly property var configSource: (typeof plasmoid !== "undefined" && plasmoid)
+                                        ? plasmoid.configuration
+                                        : ({})
+
     // 框架赋值的目标，保存时读的就是它们。初值取配置真值，两者一致。
-    property string cfg_overlayPosition: plasmoid.configuration.overlayPosition
-    property int cfg_maxColumns: plasmoid.configuration.maxColumns
-    property bool cfg_showWindowTitle: plasmoid.configuration.showWindowTitle
-    property string cfg_backgroundStyle: plasmoid.configuration.backgroundStyle
+    property string cfg_overlayPosition: page.configSource.overlayPosition || ""
+    property int cfg_maxColumns: page.configSource.maxColumns || 6
+    property bool cfg_showWindowTitle: page.configSource.showWindowTitle === undefined
+                                       ? true
+                                       : page.configSource.showWindowTitle
+    property string cfg_backgroundStyle: page.configSource.backgroundStyle || "translucent"
 
     // 按值找下拉项下标；值对不上（配置里是空或旧值）就落到第一项。
     function indexOfValue(box, value) {
@@ -51,7 +59,7 @@ KCM.SimpleKCM {
                 { value: "center", text: "屏幕中央" },
                 { value: "top", text: "屏幕顶部居中" }
             ]
-            currentIndex: page.indexOfValue(positionBox, plasmoid.configuration.overlayPosition)
+            currentIndex: page.indexOfValue(positionBox, page.configSource.overlayPosition)
             onActivated: page.cfg_overlayPosition = currentValue
         }
 
@@ -61,7 +69,7 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: "最多列数"
             from: 1
             to: 8
-            value: plasmoid.configuration.maxColumns
+            value: page.configSource.maxColumns
             onValueModified: page.cfg_maxColumns = value
         }
 
@@ -70,7 +78,7 @@ KCM.SimpleKCM {
 
             Kirigami.FormData.label: "显示窗口标题"
             text: "在应用名下面显示窗口标题"
-            checked: plasmoid.configuration.showWindowTitle
+            checked: page.configSource.showWindowTitle
             onToggled: page.cfg_showWindowTitle = checked
         }
 
@@ -84,7 +92,7 @@ KCM.SimpleKCM {
                 { value: "translucent", text: "半透明（能透出桌面）" },
                 { value: "opaque", text: "完全不透明" }
             ]
-            currentIndex: page.indexOfValue(styleBox, plasmoid.configuration.backgroundStyle)
+            currentIndex: page.indexOfValue(styleBox, page.configSource.backgroundStyle)
             onActivated: page.cfg_backgroundStyle = currentValue
         }
     }
