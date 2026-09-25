@@ -86,7 +86,39 @@ Window {
         if (overlay.selecting) {
             overlay.requestActivate();
             keyCatcher.forceActiveFocus();
+            // 让 KWin 稍后把位置摆正，见 repositionOverlay 的说明
+            replaceEarly.restart();
+            replaceLate.restart();
         }
+    }
+
+    // 让 KWin 把浮层摆回设置的位置。
+    //
+    // 为什么要绕这一圈：浮层窗口是常驻复用的，Wayland 下每次重新映射的位置都由合成器
+    // 给（默认居中）。KWin 侧靠 windowAdded 摆位置，但它并不是每次映射都会触发
+    // （实测会漏，漏的那次浮层就停在屏幕中央）。而在显示瞬间就喊也没用——那时 KWin
+    // 还不认识这个窗口（会打印「重新定位时没找到浮层」）。所以隔一会儿补喊两次。
+    // KWin 那边摆位置是幂等的（已经在对的位置就不动），重复喊没有副作用。
+    function repositionOverlay() {
+        actionSource.connectSource(
+            "qdbus6 org.kde.kglobalaccel /component/kwin "
+            + "org.kde.kglobalaccel.Component.invokeShortcut \"winwitch 重新定位\"");
+    }
+
+    Timer {
+        id: replaceEarly
+
+        interval: 700
+        repeat: false
+        onTriggered: overlay.repositionOverlay()
+    }
+
+    Timer {
+        id: replaceLate
+
+        interval: 1600
+        repeat: false
+        onTriggered: overlay.repositionOverlay()
     }
 
 

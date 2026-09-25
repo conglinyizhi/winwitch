@@ -31,6 +31,10 @@ var OVERLAY_TITLE = "WinWitch";
 
 // 选中之后由界面触发的那一个动作名。没有按键，只按名字触发。
 var COMMIT_SHORTCUT = "WinWitch 提交选择";
+// 浮层每次唤醒后会喊两次这个动作。
+// 为什么需要：windowAdded 并不是每次映射都会触发（实测有漏，漏的那次浮层就停在
+// 合成器给的居中位置），而浮层显示瞬间喊又太早（KWin 还不认识那个窗口）。
+var REPLACE_SHORTCUT = "winwitch 重新定位";
 
 // 最近一次 Begin 拿到的 token。空表示当前没有会话；陈旧 token 由 helper 拒绝。
 var sessionToken = "";
@@ -227,6 +231,22 @@ function placeOverlay(w) {
     });
 }
 
+// 把当前存在的浮层窗口摆到设置的位置（浮层那边隔一会儿会喊两次兜底）。
+function replaceOverlay() {
+    var windows = workspace.windowList();
+    var found = false;
+    for (var i = 0; i < windows.length; i++) {
+        if (windowTitleOf(windows[i]) === OVERLAY_TITLE) {
+            print("winwitch: 浮层当前 " + windows[i].x + "," + windows[i].y);
+            placeOverlay(windows[i]);
+            found = true;
+        }
+    }
+    if (!found) {
+        print("winwitch: 重新定位时没找到浮层");
+    }
+}
+
 // 浮层窗口出现时摆一次。
 //
 // 每次唤醒浮层都会重新映射，所以这里每次都会跑到，不需要额外机制去催。
@@ -272,6 +292,13 @@ function init() {
 
     // 空按键序列：不占用任何组合键，因此不会与 Meta+F 产生「遮蔽」告警，
     // 也不会抢走任何用户可能用到的键。只能通过 invokeShortcut 按名字触发。
+    registerShortcut(
+        REPLACE_SHORTCUT,
+        "把浮层摆回设置的位置（由浮层自己喊，无需手动按）",
+        "",
+        replaceOverlay
+    );
+
     registerShortcut(
         COMMIT_SHORTCUT,
         "提交当前选中的字母（由浮层触发，无需手动按）",
