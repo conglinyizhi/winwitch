@@ -15,7 +15,13 @@
 # 可用 WINWITCH_REMOTE / WINWITCH_REMOTE_DIR 覆盖默认值。
 set -euo pipefail
 
-REMOTE="${WINWITCH_REMOTE:-user@remote-host}"
+# 目标机器由环境变量给出，形如 user@host。本脚本不预设任何地址：
+# 这是开发者的私有编排，不该把某台机器的坐标写进仓库。
+REMOTE="${WINWITCH_REMOTE:-}"
+if [ -z "$REMOTE" ]; then
+    echo "需要设置 WINWITCH_REMOTE=user@host（可选 WINWITCH_REMOTE_DIR=…）" >&2
+    exit 2
+fi
 DEST="${WINWITCH_REMOTE_DIR:-disk/ai_workspace/kde-winwitch}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
