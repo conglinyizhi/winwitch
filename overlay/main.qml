@@ -30,7 +30,8 @@ Window {
     property string armedLetter: ""
     property real armedProgress: 1.0
     readonly property bool armedActive: armedLetter !== ""
-    readonly property int armedMillis: 1200
+    // 由面板推来的配置赋值（设置页「行为」分类里的启动器确认时间）
+    property int armedMillis: 1200
 
     readonly property string serviceName: "io.github.conglinyizhi.winwitch"
     readonly property string objectPath: "/winwitch"
@@ -311,6 +312,11 @@ Window {
                 }
             } else if (key === "showTitle") {
                 overlay.showWindowTitle = (value === "1");
+            } else if (key === "armed") {
+                var ms = parseInt(value, 10);
+                if (!isNaN(ms) && ms >= 100) {
+                    overlay.armedMillis = ms;
+                }
             } else if (key === "bg") {
                 overlay.backgroundStyle = (value === "opaque") ? "opaque" : "translucent";
             }

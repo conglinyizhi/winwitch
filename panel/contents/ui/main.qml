@@ -44,6 +44,10 @@ PlasmoidItem {
     // 文件的 Icon=，所以每个应用只查一次，结果缓存起来。
     property var iconCache: ({})
     property var pendingIcons: ({})
+    // 展示名（desktop 文件里的 Name=）另有缓存，理由同图标：固定但未启动的
+    // 条目没有窗口可以问，只能查 desktop 文件，查一次就记住。
+    property var nameCache: ({})
+    property var pendingNames: ({})
 
     P5Support.DataSource {
         id: orderSource
@@ -189,6 +193,48 @@ PlasmoidItem {
         return root.iconFromAppId(appId);
     }
 
+    // 取应用展示名。路子与取图标完全一致：缓存 → 没命中发一次性查询 → 本轮退回标识。
+    function desktopNameFor(appId) {
+        if (appId === "") {
+            return "";
+        }
+        if (root.nameCache[appId] !== undefined) {
+            return root.nameCache[appId];
+        }
+        if (root.pendingNames[appId] === undefined) {
+            var file = root.safeAppId(appId);
+            if (file !== "") {
+                var cmd = "for d in \"$HOME/.local/share/applications\" /usr/share/applications "
+                        + "/var/lib/flatpak/exports/share/applications; do "
+                        + "f=$d/" + file + "; [ -f \"$f\" ] && sed -n s/^Name=//p \"$f\" | head -1; done";
+                root.pendingNames[cmd] = appId;
+                nameSource.connectSource(cmd);
+            }
+        }
+        return root.iconFromAppId(appId);
+    }
+
+    P5Support.DataSource {
+        id: nameSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            var appId = root.pendingNames[sourceName];
+            nameSource.disconnectSource(sourceName);
+            if (appId === undefined) {
+                return;
+            }
+            delete root.pendingNames[sourceName];
+            var out = data && data["stdout"] ? String(data["stdout"]) : "";
+            var name = out.trim().split("\n")[0].trim();
+            if (name !== "") {
+                root.nameCache[appId] = name;
+            }
+        }
+    }
+
     P5Support.DataSource {
         id: iconSource
 
@@ -298,7 +344,7 @@ PlasmoidItem {
             return null;
         }
         var appId = ids[0];
-        return { name: root.iconFromAppId(appId), icon: root.iconFor(appId) };
+        return { name: root.desktopNameFor(appId), icon: root.iconFor(appId) };
     }
 
     // 一个固定项对应哪些应用标识（小写，含 .desktop）。
@@ -422,18 +468,25 @@ PlasmoidItem {
         var showTitle = true;
         // 注意别叫 transparent：那是 QML 内置的颜色常量，会撞名
         var backgroundStyle = "translucent";
+        // 启动器条目的确认等待（毫秒）。浮层用它倒计时，所以走同一条配置通道。
+        var armed = 1200;
         try {
             position = String(plasmoid.configuration.overlayPosition);
             columns = Number(plasmoid.configuration.maxColumns);
             showTitle = Boolean(plasmoid.configuration.showWindowTitle);
             backgroundStyle = String(plasmoid.configuration.backgroundStyle);
+            var armedRaw = Number(plasmoid.configuration.armedMillis);
+            if (armedRaw > 0) {
+                armed = armedRaw;
+            }
         } catch (e) {
             // 配置没读到就用默认值，不影响主流程
         }
         var text = "position=" + position
                  + ";columns=" + columns
                  + ";showTitle=" + (showTitle ? "1" : "0")
-                 + ";bg=" + backgroundStyle;
+                 + ";bg=" + backgroundStyle
+                 + ";armed=" + armed;
         // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
         configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "

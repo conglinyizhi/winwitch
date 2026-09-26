@@ -79,10 +79,11 @@ note "5. 配置键与设置页属性对齐"
 # 只声明不用不行，只写属性不声明也不行，所以两边必须严格相等。
 xml_keys="$(grep -oE '<entry name="[A-Za-z0-9_]+"' panel/contents/config/main.xml \
     | sed 's/.*name="//; s/"//' | sort)"
-qml_keys="$(grep -oE 'property (alias|string|bool|int|real) cfg_[A-Za-z0-9_]+' \
-    panel/contents/ui/configGeneral.qml | sed 's/.*cfg_//' | sort)"
+# 设置页可以有多个（外观、行为…），所有页的 cfg_ 属性合起来与配置键对齐
+qml_keys="$(grep -hoE 'property (alias|string|bool|int|real) cfg_[A-Za-z0-9_]+' \
+    panel/contents/ui/config*.qml | sed 's/.*cfg_//' | sort)"
 if [ "$xml_keys" != "$qml_keys" ]; then
-    bad "main.xml 的键与 configGeneral.qml 的 cfg_ 属性不一致（左 xml / 右 qml）"
+    bad "main.xml 的键与设置页的 cfg_ 属性不一致（左 xml / 右 qml）"
     diff <(echo "$xml_keys") <(echo "$qml_keys") || true
 fi
 # 另外：废弃键若还留在用户配置里，同样会让整页初始化失败（安装脚本会清，这里只提示）。

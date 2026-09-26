@@ -23,5 +23,11 @@
         <entry name="backgroundStyle" type="String">
             <default>translucent</default>
         </entry>
+        <!-- 启动器条目的确认等待（毫秒）：第一次按下后等这么久，期间再按一次才启动 -->
+        <entry name="armedMillis" type="Int">
+            <default>1200</default>
+            <min>300</min>
+            <max>5000</max>
+        </entry>
     </group>
 </kcfg>

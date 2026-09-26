@@ -8,4 +8,12 @@ ConfigModel {
         icon: "preferences-desktop-theme"
         source: "configGeneral.qml"
     }
+
+    // 冷却时长这类操作手感项归这里，别再往「外观」里塞：
+    // 改它的人找的是行为，不是配色。
+    ConfigCategory {
+        name: "行为"
+        icon: "preferences-system"
+        source: "configBehavior.qml"
+    }
 }
