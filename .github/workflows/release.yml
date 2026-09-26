@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# 打 v* tag 时构建静态 helper 并挂到 Release。
+# 静态二进制是为了一个文件通吃各发行版，用户不必安装 MoonBit。
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: 安装依赖
+        run: |
+          pacman -Syu --noconfirm --needed bash python nodejs qt6-declarative git github-cli
+
+      - uses: actions/checkout@v4
+
+      - name: 安装 MoonBit
+        run: |
+          curl -fsSL -o /tmp/moon-install.sh https://cli.moonbitlang.com/install/unix.sh
+          MOONBIT_INSTALL_VERSION=nightly bash /tmp/moon-install.sh
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: 检查与测试
+        run: make ci
+
+      - name: 静态构建
+        run: bash scripts/build-static.sh
+
+      - name: 准备发布资产
+        run: |
+          mkdir -p dist
+          cp _build/native/release/build/cmd/main/main.exe dist/winwitch-helper
+          tar -czf "dist/winwitch-${GITHUB_REF_NAME#v}-addon.tar.gz" \
+            kwin panel overlay data scripts/install.sh scripts/reload.sh
+
+      - name: 挂到 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" --generate-notes \
+          || gh release upload "$GITHUB_REF_NAME" dist/* --clobber

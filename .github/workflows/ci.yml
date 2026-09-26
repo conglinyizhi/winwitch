@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# 在干净的容器里跑与本地相同的检查（make ci）。
+# 刻意不用开发机上的任何私有脚本：这里的路径就是外部贡献者会走的路径。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: 安装依赖
+        run: |
+          pacman -Syu --noconfirm --needed bash python nodejs qt6-declarative git
+
+      - uses: actions/checkout@v4
+
+      - name: 安装 MoonBit
+        # 用每夜构建：稳定版常缺本项目需要的语言特性。
+        # 上游不提供可钉死的历史版本 URL（指定版本会 403），所以这里只能跟着 nightly 走；
+        # 若某天构建突然失败，先看是不是 nightly 前进导致的。
+        run: |
+          curl -fsSL -o /tmp/moon-install.sh https://cli.moonbitlang.com/install/unix.sh
+          MOONBIT_INSTALL_VERSION=nightly bash /tmp/moon-install.sh
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: 检查与测试
+        run: make ci
+
+      - name: 静态构建（确保发布路径一直可用）
+        run: bash scripts/build-static.sh
