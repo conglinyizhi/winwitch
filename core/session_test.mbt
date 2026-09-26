@@ -172,7 +172,7 @@ test "begin_tasks 记住标题并出现在快照里" {
   // 没有槽位时应用名退回 KWin 的应用标识，图标名留空。
   assert_eq(
     session.snapshot(),
-    "selecting:t1:A=w1\tS=w2\nA\tkate\t\t编辑器\t\nS\tfirefox\t\t浏览器\t",
+    "selecting:t1:A=w1\tS=w2\nA\tkate\t\t编辑器\t\t\nS\tfirefox\t\t浏览器\t\t",
   )
 }
 
@@ -259,7 +259,7 @@ test "启动器位置会空掉一个字母，保证后面与图标对齐" {
   let session = @core.Session::new()
   // 任务栏：两个常驻图标在前，然后是 w1、w2
   let slots = @core.parse_slots(
-    "\t启动器A\tapp-a\t\n\t启动器B\tapp-b\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t",
+    "\t启动器A\tapp-a\t\n\t启动器B\tapp-b\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t\t",
   )
   ignore(session.begin(["w1", "w2"]))
   ignore(session.set_slots(slots))
@@ -338,7 +338,7 @@ test "快照带出应用名与图标名" {
   ignore(session.set_slots(slots))
   assert_eq(
     session.snapshot(),
-    "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题\t",
+    "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题\t\t",
   )
 }
 
@@ -346,7 +346,7 @@ test "快照带出应用名与图标名" {
 test "分组图标里的多个窗口连续占字母" {
   let session = @core.Session::new()
   let slots = @core.parse_slots(
-    "w1,w2\t编辑器\tkate\t\nw3\t浏览器\tfirefox\t",
+    "w1,w2\t编辑器\tkate\t\nw3\t浏览器\tfirefox\t\t",
   )
   ignore(session.begin(["w1", "w2", "w3"]))
   ignore(session.set_slots(slots))

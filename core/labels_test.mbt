@@ -180,8 +180,8 @@ test "parse_tasks 解析 id 标题 应用标识" {
     tasks,
     content=(
       #|[
-      #|  { id: "id1", title: "标题一", app_id: "firefox" },
-      #|  { id: "id2", title: "标题二", app_id: "konsole" },
+      #|  { id: "id1", title: "标题一", app_id: "firefox", state: "" },
+      #|  { id: "id2", title: "标题二", app_id: "konsole", state: "" },
       #|]
     ),
   )
@@ -196,7 +196,7 @@ test "parse_tasks 丢弃列数不足或 ID 为空的行" {
   debug_inspect(
     tasks,
     content=(
-      #|[{ id: "id4", title: "标题四", app_id: "vim" }]
+      #|[{ id: "id4", title: "标题四", app_id: "vim", state: "" }]
     ),
   )
 }
@@ -207,7 +207,7 @@ test "parse_tasks 允许缺少应用标识" {
   debug_inspect(
     tasks,
     content=(
-      #|[{ id: "id1", title: "标题", app_id: "" }]
+      #|[{ id: "id1", title: "标题", app_id: "", state: "" }]
     ),
   )
 }

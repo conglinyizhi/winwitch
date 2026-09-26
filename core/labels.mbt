@@ -5,6 +5,9 @@ pub(all) struct TaskMeta {
   id : String
   title : String
   app_id : String
+  /// 窗口状态，由 KWin 给出：a = 当前前台，m = 已最小化，空 = 普通。
+  /// KWin 是唯一同时知道这两件事的地方，所以这一位在它那侧算。
+  state : String
 } derive(Debug, Eq)
 
 ///|
@@ -58,7 +61,13 @@ pub fn parse_tasks(text : String) -> Array[TaskMeta] {
           } else {
             ""
           }
-          out.push({ id, title, app_id, })
+          // 第 4 段是状态；旧格式没有这一段时不报错，按普通处理
+          let state = if parts.length() >= 4 {
+            sanitize_field(parts[3])
+          } else {
+            ""
+          }
+          out.push({ id, title, app_id, state, })
         }
       }
     }
@@ -367,6 +376,11 @@ pub fn encode_detail_full(
     }
     let task = find_task(tasks, label.window_id)
     // 窗口标题优先用 KWin 的 caption（真实窗口标题），取不到再退回槽位的展示文本
+    let mut state = ""
+    match task {
+      Some(t) => state = t.state
+      None => ()
+    }
     let mut title = match task {
       Some(t) => t.title
       None => ""
@@ -392,7 +406,9 @@ pub fn encode_detail_full(
       "\t" +
       title +
       "\t" +
-      launcher_flag
+      launcher_flag +
+      "\t" +
+      state
   }
   out
 }

@@ -239,6 +239,8 @@ Window {
                         appName: row.length > 1 ? row[1] : "",
                         iconName: row.length > 2 ? row[2] : "",
                         isLauncher: row.length > 4 && row[4] === "1",
+                        // 第 6 列：窗口状态，KWin 给的（a = 前台，m = 最小化，空 = 普通）
+                        state: row.length > 5 ? row[5] : "",
                         title: row.length > 3 ? row[3] : ""
                     });
                 }
@@ -485,13 +487,16 @@ Window {
                     height: overlay.cardHeight
                     radius: 4
                     color: cardArea.containsMouse ? overlay.cardHoverColor : overlay.cardColor
-                    // 冷却进行中：把其他卡片压暗，视线只留在一个上
-                    opacity: overlay.armedActive
-                             && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0
+                    // 已最小化的窗口压暗；冷却进行中再把其他卡片压得更暗，
+                    // 视线只留在一个上。两个条件相乘，别互相盖掉。
+                    opacity: (overlay.armedActive
+                              && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0)
+                             * (card.modelData.state === "m" ? 0.55 : 1.0)
                     // 启动器条目（固定着但没启动）：先靠描边区别出来，
                     // 按一次之后它会浮出倒计时饼图
-                    border.width: card.modelData.isLauncher ? 2 : 0
-                    border.color: "#8ea0b5"
+                    // 描边优先级：启动器（灰蓝，按两次才启动）> 当前前台（金色）
+                    border.width: card.modelData.isLauncher || card.modelData.state === "a" ? 2 : 0
+                    border.color: card.modelData.isLauncher ? "#8ea0b5" : "#f5c542"
 
                     Row {
                         anchors.fill: parent

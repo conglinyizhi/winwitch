@@ -21,8 +21,23 @@ KCM.SimpleKCM {
                                         : ({})
 
     property int cfg_armedMillis: page.configSource.armedMillis || 1200
+    // 判 undefined 而不是用 ||：布尔默认值会被 false 绕过
+    property bool cfg_minimizeActive: page.configSource.minimizeActive === undefined
+                                      ? true
+                                      : page.configSource.minimizeActive
 
     Kirigami.FormLayout {
+        QQC2.CheckBox {
+            Kirigami.FormData.label: "选到已在前台的窗口："
+
+            text: "最小化它"
+            checked: page.cfg_minimizeActive
+            onToggled: page.cfg_minimizeActive = checked
+
+            QQC2.ToolTip.visible: hovered
+            QQC2.ToolTip.text: "关掉的话，选到已在前台的窗口只是把它重新带到前台"
+        }
+
         QQC2.SpinBox {
             id: armedSpin
 

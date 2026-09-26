@@ -470,6 +470,8 @@ PlasmoidItem {
         var backgroundStyle = "translucent";
         // 启动器条目的确认等待（毫秒）。浮层用它倒计时，所以走同一条配置通道。
         var armed = 1200;
+        // KWin 脚本用它决定：选到已在前台的窗口时，最小化还是只重新激活
+        var minimizeActive = true;
         try {
             position = String(plasmoid.configuration.overlayPosition);
             columns = Number(plasmoid.configuration.maxColumns);
@@ -479,6 +481,12 @@ PlasmoidItem {
             if (armedRaw > 0) {
                 armed = armedRaw;
             }
+            // 布尔值要判 undefined：直接 Boolean(undefined) 会变成 false，
+            // 把「没配过」误当成「关掉了」
+            var minimizeRaw = plasmoid.configuration.minimizeActive;
+            if (minimizeRaw !== undefined) {
+                minimizeActive = Boolean(minimizeRaw);
+            }
         } catch (e) {
             // 配置没读到就用默认值，不影响主流程
         }
@@ -486,7 +494,8 @@ PlasmoidItem {
                  + ";columns=" + columns
                  + ";showTitle=" + (showTitle ? "1" : "0")
                  + ";bg=" + backgroundStyle
-                 + ";armed=" + armed;
+                 + ";armed=" + armed
+                 + ";minimizeActive=" + (minimizeActive ? "1" : "0");
         // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
         configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "

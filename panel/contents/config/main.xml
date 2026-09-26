@@ -23,6 +23,10 @@
         <entry name="backgroundStyle" type="String">
             <default>translucent</default>
         </entry>
+        <!-- 选中一个已在前台的窗口时，是最小化它（true）还是只重新激活（false） -->
+        <entry name="minimizeActive" type="Bool">
+            <default>true</default>
+        </entry>
         <!-- 启动器条目的确认等待（毫秒）：第一次按下后等这么久，期间再按一次才启动 -->
         <entry name="armedMillis" type="Int">
             <default>1200</default>

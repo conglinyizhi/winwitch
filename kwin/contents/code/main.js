@@ -103,10 +103,19 @@ function beginSelection() {
     var lines = [];
     for (var i = 0; i < windows.length; i++) {
         var w = windows[i];
-        // 每行 id\t标题\t应用标识，顺序即字母顺序。
+        // 状态段：a = 当前前台，m = 已最小化，空 = 普通。
+        // KWin 是唯一同时知道这两件事的地方（workspace.activeWindow / win.minimized），
+        // 所以状态在这里算，下游只负责把它画出来。
+        var state = "";
+        if (workspace.activeWindow === w) {
+            state = "a";
+        } else if (w.minimized) {
+            state = "m";
+        }
+        // 每行 id\t标题\t应用标识\t状态，顺序即字母顺序。
         // 标题与应用标识要一起送过去，否则界面无法说明「这个字母是哪个窗口」。
         lines.push(windowIdOf(w) + "\t" + sanitizeField(windowTitleOf(w))
-                   + "\t" + sanitizeField(windowAppIdOf(w)));
+                   + "\t" + sanitizeField(windowAppIdOf(w)) + "\t" + state);
     }
     callDBus(SERVICE, PATH, IFACE, "Begin", lines.join("\n"), function (reply) {
         var text = reply ? String(reply) : "";
@@ -134,17 +143,58 @@ function callCancel() {
     });
 }
 
+// 选中一个窗口之后到底做什么，照 KDE 任务栏点击图标的语义来。
+// 原文：plasma-desktop/applets/taskmanager/qml/code/TaskTools.js 的 activateTask，
+// 非分组分支只有三条：
+//   已最小化          -> 先取消最小化，再激活（恢复并聚焦）
+//   已是活动窗口 + 开关打开 -> 最小化它
+//   其它              -> 普通激活
+// KDE 那边这个开关是 minimizeActiveTaskOnClick，默认关；本项目默认开，
+// 因为它就是提督要的行为。
+function applyActivation(win, minimizeActive) {
+    var title = windowTitleOf(win);
+    try {
+        if (win.minimized) {
+            win.minimized = false;
+            workspace.activeWindow = win;
+            print("winwitch: 已恢复并激活 " + title);
+        } else if (win === workspace.activeWindow && minimizeActive) {
+            win.minimized = true;
+            print("winwitch: 已最小化 " + title);
+        } else {
+            workspace.activeWindow = win;
+            print("winwitch: 已激活 " + title);
+        }
+    } catch (e) {
+        print("winwitch: 激活抛错 " + e);
+    }
+}
+
+// 开关走 helper 的配置串（面板推来的那一条），没拿到就按默认（开）处理。
+function readMinimizeActiveFlag(callback) {
+    callDBus(SERVICE, PATH, IFACE, "Settings", function (reply) {
+        var minimizeActive = true;
+        var text = reply ? String(reply) : "";
+        var parts = text.split(";");
+        for (var i = 0; i < parts.length; i++) {
+            if (parts[i] === "minimizeActive=0") {
+                minimizeActive = false;
+            } else if (parts[i] === "minimizeActive=1") {
+                minimizeActive = true;
+            }
+        }
+        callback(minimizeActive);
+    });
+}
+
 function activateWindowById(id) {
     var windows = switchableWindows();
     for (var i = 0; i < windows.length; i++) {
         if (windowIdOf(windows[i]) === id) {
-            try {
-                var title = windowTitleOf(windows[i]);
-                workspace.activeWindow = windows[i];
-                print("winwitch: 已激活 " + title);
-            } catch (e) {
-                print("winwitch: 激活抛错 " + e);
-            }
+            var win = windows[i];
+            readMinimizeActiveFlag(function (minimizeActive) {
+                applyActivation(win, minimizeActive);
+            });
             return true;
         }
     }
