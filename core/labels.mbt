@@ -331,6 +331,14 @@ pub fn encode_detail_full(
 ) -> String {
   let mut out = ""
   let mut first = true
+  // 启动器槽位（ids 为空）没有窗口 ID，没法按 ID 匹配，只能按顺序认领。
+  let empty_slots : Array[Slot] = []
+  for s in slots {
+    if s.ids.length() == 0 {
+      empty_slots.push(s)
+    }
+  }
+  let mut empty_used = 0
   for label in labels {
     if !first {
       out = out + "\n"
@@ -339,13 +347,23 @@ pub fn encode_detail_full(
     let mut app_name = ""
     let mut icon_name = ""
     let mut slot_title = ""
+    let mut is_launcher = false
     match find_slot(slots, label.window_id) {
       Some(slot) => {
         app_name = slot.app_name
         icon_name = slot.icon_name
         slot_title = slot.title
       }
-      None => ()
+      None =>
+        // 窗口 ID 为空的字母 = 固定着但没启动的应用，拿一个空槽位的元数据
+        if label.window_id == "" && empty_used < empty_slots.length() {
+          let s = empty_slots[empty_used]
+          empty_used = empty_used + 1
+          app_name = s.app_name
+          icon_name = s.icon_name
+          slot_title = s.title
+          is_launcher = true
+        }
     }
     let task = find_task(tasks, label.window_id)
     // 窗口标题优先用 KWin 的 caption（真实窗口标题），取不到再退回槽位的展示文本
@@ -363,7 +381,18 @@ pub fn encode_detail_full(
         None => ()
       }
     }
-    out = out + label.letter + "\t" + app_name + "\t" + icon_name + "\t" + title
+    // 第 5 列：1 = 启动器条目（要按两次才启动），空 = 普通窗口
+    let launcher_flag = if is_launcher { "1" } else { "" }
+    out = out +
+      label.letter +
+      "\t" +
+      app_name +
+      "\t" +
+      icon_name +
+      "\t" +
+      title +
+      "\t" +
+      launcher_flag
   }
   out
 }

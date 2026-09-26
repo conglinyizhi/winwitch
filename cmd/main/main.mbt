@@ -60,6 +60,10 @@ fn describe(action : @core.Action) -> String {
     Activate(window_id) => "activate:" + window_id
     Cancel => "cancel"
     Timeout => "timeout"
+    // 启动器条目的两次确认：第一次进冷却、第二次才是启动
+    Arm(letter) => "arm:" + letter
+    Launch(letter) => "launch:" + letter
+    Expire => "expire"
     Ignore => "ignore"
   }
 }
@@ -121,6 +125,14 @@ fn dispatch(session : @core.Session, ctx : @dbus.DispatchCtx) -> @dbus.Reply {
     // 只能由 KWin 来摆位置）。
     "Settings" => string_reply(session.settings())
     // 取走待激活的窗口。界面选完之后触发 KWin 的「提交」动作，KWin 再来调这个。
+    // 取走待启动的启动器字母。面板轮询快照发现 `@launch=` 后调这个，
+    // 拿到字母就去启动对应 launcher（launcher URL 只在面板手里）。
+    "TakeLaunch" => string_reply(session.take_launch())
+    // 冷却到期：浮层的倒计时走完时调，撤销冷却但继续停在选择里。
+    "Expire" => {
+      let _ = session.handle_expire(first_arg(ctx.body))
+      string_reply("ok")
+    }
     "TakePending" =>
       match session.take_pending() {
         Some(id) => string_reply("activate:" + id)

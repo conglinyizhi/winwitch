@@ -25,6 +25,12 @@ Window {
     property string token: ""
     // 每行 { letter, title, appName, iconName }
     property var rows: []
+    // 冷却：启动器条目第一次命中后的等待期。字母由 helper 的 `@armed=` 给，
+    // 走空饼图由 armedProgress 驱动（不显示数字）。
+    property string armedLetter: ""
+    property real armedProgress: 1.0
+    readonly property bool armedActive: armedLetter !== ""
+    readonly property int armedMillis: 1200
 
     readonly property string serviceName: "io.github.conglinyizhi.winwitch"
     readonly property string objectPath: "/winwitch"
@@ -211,7 +217,16 @@ Window {
             // 明细行：字母、应用名、图标名、窗口标题。
             // 另有一行 @config=... 承载外观配置，不是窗口。
             var parsed = [];
+            overlay.armedLetter = "";
             for (var j = 1; j < lines.length; j++) {
+                if (lines[j].indexOf("@armed=") === 0) {
+                    overlay.armedLetter = lines[j].substring("@armed=".length).trim();
+                    continue;
+                }
+                // 启动请求交给面板执行（launcher URL 在面板手里），浮层只负责显示
+                if (lines[j].indexOf("@launch=") === 0) {
+                    continue;
+                }
                 if (lines[j].indexOf("@config=") === 0) {
                     overlay.applyConfig(lines[j].substring("@config=".length));
                     continue;
@@ -222,6 +237,7 @@ Window {
                         letter: row[0],
                         appName: row.length > 1 ? row[1] : "",
                         iconName: row.length > 2 ? row[2] : "",
+                        isLauncher: row.length > 4 && row[4] === "1",
                         title: row.length > 3 ? row[3] : ""
                     });
                 }
@@ -229,7 +245,8 @@ Window {
             // helper 没给明细时，至少把字母显示出来
             if (parsed.length === 0) {
                 for (var k = 0; k < letters.length; k++) {
-                    parsed.push({ letter: letters[k], appName: "", iconName: "", title: "" });
+                    parsed.push({ letter: letters[k], appName: "", iconName: "", title: "",
+                              isLauncher: false });
                 }
             }
 
@@ -318,6 +335,25 @@ Window {
             + "org.kde.kglobalaccel.Component.invokeShortcut \"WinWitch 提交选择\"");
     }
 
+    // 冷却进度：每 60ms 重画一次饼图，armedMillis 走完归零
+    Timer {
+        interval: 60
+        running: overlay.armedActive
+        repeat: true
+        onTriggered: {
+            overlay.armedProgress = Math.max(0.0,
+                                             overlay.armedProgress - 60 / overlay.armedMillis);
+        }
+    }
+
+    // 冷却走完：撤销冷却（helper 那边回初始，但仍停在选择里）
+    Timer {
+        interval: overlay.armedMillis
+        running: overlay.armedActive
+        repeat: false
+        onTriggered: overlay.expireArmed()
+    }
+
     P5Support.DataSource {
         id: chooseSource
 
@@ -353,6 +389,21 @@ Window {
         onNewData: function (sourceName) {
             noteSource.disconnectSource(sourceName);
         }
+    }
+
+    // 冷却开始：饼图从满开始走空
+    onArmedLetterChanged: {
+        overlay.armedProgress = 1.0;
+    }
+
+    // 冷却作废（超时或用户按了别的字母）：告诉 helper 撤销，选择模式继续
+    function expireArmed() {
+        if (!overlay.armedActive) {
+            return;
+        }
+        overlay.armedLetter = "";
+        actionSource.connectSource("qdbus6 " + overlay.serviceName + " " + overlay.objectPath
+                                   + " io.github.conglinyizhi.winwitch.Expire " + overlay.token);
     }
 
     P5Support.DataSource {
@@ -425,6 +476,13 @@ Window {
                     height: overlay.cardHeight
                     radius: 4
                     color: cardArea.containsMouse ? overlay.cardHoverColor : overlay.cardColor
+                    // 冷却进行中：把其他卡片压暗，视线只留在一个上
+                    opacity: overlay.armedActive
+                             && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0
+                    // 启动器条目（固定着但没启动）：先靠描边区别出来，
+                    // 按一次之后它会浮出倒计时饼图
+                    border.width: card.modelData.isLauncher ? 2 : 0
+                    border.color: "#8ea0b5"
 
                     Row {
                         anchors.fill: parent
@@ -444,6 +502,45 @@ Window {
                                 // 后者要转成 URL 才能被 Icon 加载。
                                 source: overlay.iconSource(card.modelData.iconName)
                                 fallback: "application-x-executable"
+                            }
+
+                            // 冷却倒计时：逐渐走空的饼图，不显示数字
+                            Canvas {
+                                id: countdownPie
+
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                width: Math.round(overlay.iconSize * 0.8)
+                                height: width
+                                visible: card.modelData.isLauncher
+                                         && overlay.armedLetter === card.modelData.letter
+
+                                onPaint: {
+                                    var ctx = getContext("2d");
+                                    ctx.reset();
+                                    var cx = width / 2;
+                                    var cy = height / 2;
+                                    var r = Math.min(cx, cy) - 1;
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                    ctx.fillStyle = "rgba(18,20,26,0.85)";
+                                    ctx.fill();
+                                    ctx.beginPath();
+                                    ctx.moveTo(cx, cy);
+                                    ctx.arc(cx, cy, r, -Math.PI / 2,
+                                            -Math.PI / 2 + Math.PI * 2 * overlay.armedProgress);
+                                    ctx.closePath();
+                                    ctx.fillStyle = "#f5c542";
+                                    ctx.fill();
+                                }
+
+                                Connections {
+                                    target: overlay
+
+                                    function onArmedProgressChanged() {
+                                        countdownPie.requestPaint();
+                                    }
+                                }
                             }
 
                             Rectangle {

@@ -290,6 +290,17 @@ PlasmoidItem {
         preferredSource.connectSource(cmd);
     }
 
+    // 「固定但未启动」的条目：没有窗口可依附，应用名和图标只能自己带。
+    // 不加这个的话，浮层只看到一个空字母位（提督截图里 A 那个位置就是）。
+    function launcherMeta(entry) {
+        var ids = root.appIdsForLauncher(entry);
+        if (ids.length === 0) {
+            return null;
+        }
+        var appId = ids[0];
+        return { name: root.iconFromAppId(appId), icon: root.iconFor(appId) };
+    }
+
     // 一个固定项对应哪些应用标识（小写，含 .desktop）。
     function appIdsForLauncher(entry) {
         var text = String(entry);
@@ -365,6 +376,8 @@ PlasmoidItem {
         }
 
         var ordered = [];
+        // 与 ordered 一一对应：非 null 表示这是「固定未启动」的条目，元数据得自带
+        var meta = [];
         for (var l = 0; l < root.launchers.length; l++) {
             var wantIds = root.appIdsForLauncher(root.launchers[l]);
             var slotIds = [];
@@ -379,17 +392,25 @@ PlasmoidItem {
                 }
             }
             ordered.push(slotIds);
+            // 没有对应窗口 = 固定着但没启动，这条要自己带元数据
+            meta.push(slotIds.length === 0 ? root.launcherMeta(root.launchers[l]) : null);
         }
 
         for (var j = 0; j < rows.length; j++) {
             if (!used[j]) {
                 ordered.push(rows[j].ids);
+                meta.push(null);
             }
         }
 
         var lines = [];
         for (var s = 0; s < ordered.length; s++) {
-            lines.push(ordered[s].join(",") + "\t\t\t");
+            if (meta[s] !== null) {
+                // 空窗口 ID + 自带的应用名与图标，标题留空（它没有窗口）
+                lines.push("\t" + meta[s].name + "\t" + meta[s].icon + "\t");
+            } else {
+                lines.push(ordered[s].join(",") + "\t\t\t");
+            }
         }
         return { lines: lines, rows: rows };
     }
@@ -417,6 +438,105 @@ PlasmoidItem {
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
         configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
                                    + "io.github.conglinyizhi.winwitch.Config " + root.shellQuote(text));
+    }
+
+    // 字母表必须与 core/labels.mbt 的 default_alphabet 完全一致：
+    // 字母是按槽位顺序分的，所以「字母在该串里的下标」就是槽位下标。
+    readonly property string alphabet: "ASDFGHJKLQWERTYUIOPZXCVBNM"
+
+    // 启动一个 launcher URL（形如 applications:xxx.desktop，或 preferred://filemanager）。
+    // 用 KDE 自己的 kioclient；找不到才退到旧名字。命令整串走 shell，所以必须引号。
+    function launchEntry(entry) {
+        if (!entry) {
+            return;
+        }
+        // 实测：kioclient exec 不接受 `applications:xxx.desktop` 这种 URL，会弹
+        // 「未知应用程序文件夹」。gtk-launch 按 XDG 桌面文件名启动，正好对得上，
+        // 名字从 launcher URL 里剥（去掉 applications: 前缀和 .desktop 后缀）。
+        var ids = root.appIdsForLauncher(entry);
+        if (ids.length > 0) {
+            var name = String(ids[0]);
+            if (name.length > 8 && name.substring(name.length - 8) === ".desktop") {
+                name = name.substring(0, name.length - 8);
+            }
+            launchExec.connectSource("gtk-launch " + root.shellQuote(name));
+            return;
+        }
+        // 解析不出桌面文件名的（比如 preferred:// 之外的怪 URL），退回按 URL 处理
+        launchExec.connectSource("kioclient exec " + root.shellQuote(entry));
+    }
+
+    // helper 报出「要启动字母 X」时：取走请求，再启动对应的固定项。
+    // 字母 → 槽位 → launcher，用下标对齐（字母表顺序 = 槽位顺序）。
+    function handleLaunch(letter) {
+        var index = root.alphabet.indexOf(letter);
+        if (index < 0 || index >= root.launchers.length) {
+            return;
+        }
+        var entry = root.launchers[index];
+        takeLaunchSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
+                                       + "io.github.conglinyizhi.winwitch.TakeLaunch");
+        root.launchEntry(entry);
+    }
+
+    // 从快照里挑出 `@launch=<字母>` 那一行。
+    function launchLetterFrom(text) {
+        var lines = String(text).split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            if (lines[i].indexOf("@launch=") === 0) {
+                return lines[i].substring(8).trim();
+            }
+        }
+        return "";
+    }
+
+    function pollLaunch() {
+        statusSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
+                                   + "io.github.conglinyizhi.winwitch.Status");
+    }
+
+    Timer {
+        interval: 500
+        running: true
+        repeat: true
+        onTriggered: root.pollLaunch()
+    }
+
+    P5Support.DataSource {
+        id: statusSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            var letter = root.launchLetterFrom(data["stdout"] || "");
+            if (letter !== "") {
+                root.handleLaunch(letter);
+            }
+            disconnectSource(sourceName);
+        }
+    }
+
+    P5Support.DataSource {
+        id: takeLaunchSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            disconnectSource(sourceName);
+        }
+    }
+
+    P5Support.DataSource {
+        id: launchExec
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            disconnectSource(sourceName);
+        }
     }
 
     P5Support.DataSource {

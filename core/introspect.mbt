@@ -38,6 +38,13 @@ pub fn introspection_xml() -> String {
     #|    <method name="TakePending">
     #|      <arg name="window_id" type="s" direction="out"/>
     #|    </method>
+    #|    <method name="TakeLaunch">
+    #|      <arg name="letter" type="s" direction="out"/>
+    #|    </method>
+    #|    <method name="Expire">
+    #|      <arg name="token" type="s" direction="in"/>
+    #|      <arg name="result" type="s" direction="out"/>
+    #|    </method>
     #|    <method name="Order">
     #|      <arg name="window_ids" type="s" direction="in"/>
     #|      <arg name="result" type="s" direction="out"/>

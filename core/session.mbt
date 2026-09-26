@@ -14,6 +14,12 @@ pub(all) enum Action {
   Cancel
   /// 超时退出。
   Timeout
+  /// 启动器条目第一次命中：进冷却，停在选择里等第二次。
+  Arm(String)
+  /// 冷却中再次命中：启动这个字母对应的应用。
+  Launch(String)
+  /// 冷却到期：撤销冷却，仍停在选择里。
+  Expire
   /// 不认识、不属于当前会话，或处于空闲：什么都不做。
   Ignore
 } derive(Debug, Eq)
@@ -33,6 +39,10 @@ pub(all) struct Session {
   mut tasks : Array[TaskMeta]
   mut slots : Array[Slot]
   mut pending : String
+  // 冷却中的启动器字母（固定着但没启动的应用要按两次），"" = 不在冷却
+  mut armed : String
+  // 待启动的启动器字母：面板取走后清空（launcher URL 在面板手里）
+  mut launch : String
   mut config : String
 }
 
@@ -40,6 +50,8 @@ pub(all) struct Session {
 pub fn Session::new() -> Session {
   {
     phase: Idle,
+    armed: "",
+    launch: "",
     token: "t0",
     next_token: 1,
     labels: [],
@@ -191,7 +203,12 @@ fn Session::relabel_by_slots(
       break
     }
     if slot.ids.length() == 0 {
-      // 占位：消耗一个字母，但不产生标签
+      // 固定着但没启动的应用：同样占一个字母位，并且要产出一个「没有窗口」的标签，
+      // 否则字母被白白吞掉，浮层画不出卡片。
+      match alphabet.get_char(slot_index) {
+        Some(ch) => out.push({ letter: ch.to_string(), window_id: "", })
+        None => ()
+      }
       slot_index = slot_index + 1
       continue
     }
@@ -243,6 +260,7 @@ pub fn Session::set_slots(
 ///|
 /// 清空状态并作废当前 token。取消与超时都走这里。
 pub fn Session::clear(self : Session) -> Unit {
+  self.armed = ""
   self.phase = Idle
   self.labels = []
   self.tasks = []
@@ -269,16 +287,49 @@ pub fn Session::handle_key(
     return self.handle_cancel(token)
   }
   match lookup_label(self.labels, key) {
-    Some(wid) => {
-      // 记下待激活的窗口：本轮选择可能是界面点的，也可能是键盘按的。
-      // 浮层不能直接激活窗口（KWin 也没暴露按 UUID 激活的接口），
-      // 所以要留在这里等 KWin 来取。
-      self.pending = wid
-      self.clear()
-      Activate(wid)
-    }
+    Some(wid) =>
+      // 空窗口 ID = 固定着但没启动的应用：第一次按键只进冷却，不启动。
+      if wid == "" {
+        if self.armed == key {
+          // 冷却中再按同一个键：这才是启动
+          self.launch = key
+          self.clear()
+          Launch(key)
+        } else {
+          // 首次命中（或从冷却切到另一个启动器）：进冷却，停在选择里
+          self.armed = key
+          Arm(key)
+        }
+      } else {
+        // 命中了别的字母：冷却立刻作废，按窗口正常走
+        self.armed = ""
+        // 记下待激活的窗口：本轮选择可能是界面点的，也可能是键盘按的。
+        // 浮层不能直接激活窗口（KWin 也没暴露按 UUID 激活的接口），
+        // 所以要留在这里等 KWin 来取。
+        self.pending = wid
+        self.clear()
+        Activate(wid)
+      }
     None => Ignore
   }
+}
+
+///|
+/// 冷却到期：回到初始状态，但**不退出选择**（还没做完的事只是被撤销）。
+pub fn Session::handle_expire(self : Session, token : String) -> Action {
+  if token != self.token || self.phase is Idle {
+    return Ignore
+  }
+  self.armed = ""
+  Expire
+}
+
+///|
+/// 面板取走待启动的字母，避免反复启动。
+pub fn Session::take_launch(self : Session) -> String {
+  let letter = self.launch
+  self.launch = ""
+  letter
 }
 
 ///|
@@ -356,9 +407,20 @@ pub fn Session::snapshot(self : Session) -> String {
   } else {
     head + "\n@config=" + self.config
   }
-  if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
+  // 冷却与待启动的字母：浮层靠它画倒计时，面板靠它去启动
+  let with_state = if self.armed == "" {
     with_config
   } else {
-    with_config + "\n" + encode_detail_full(self.labels, self.tasks, self.slots)
+    with_config + "\n@armed=" + self.armed
+  }
+  let with_state = if self.launch == "" {
+    with_state
+  } else {
+    with_state + "\n@launch=" + self.launch
+  }
+  if self.phase is Idle || self.labels.length() == 0 || self.tasks.length() == 0 {
+    with_state
+  } else {
+    with_state + "\n" + encode_detail_full(self.labels, self.tasks, self.slots)
   }
 }

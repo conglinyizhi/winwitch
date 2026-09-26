@@ -172,7 +172,7 @@ test "begin_tasks 记住标题并出现在快照里" {
   // 没有槽位时应用名退回 KWin 的应用标识，图标名留空。
   assert_eq(
     session.snapshot(),
-    "selecting:t1:A=w1\tS=w2\nA\tkate\t\t编辑器\nS\tfirefox\t\t浏览器",
+    "selecting:t1:A=w1\tS=w2\nA\tkate\t\t编辑器\t\nS\tfirefox\t\t浏览器\t",
   )
 }
 
@@ -264,11 +264,70 @@ test "启动器位置会空掉一个字母，保证后面与图标对齐" {
   ignore(session.begin(["w1", "w2"]))
   ignore(session.set_slots(slots))
   let labels = session.labels()
-  // 前两个位置空掉 A、S，w1 拿 D，w2 拿 F
-  assert_eq(labels[0].letter, "D")
-  assert_eq(labels[0].window_id, "w1")
-  assert_eq(labels[1].letter, "F")
-  assert_eq(labels[1].window_id, "w2")
+  // 四个字母按槽位分：启动器 A、S（空窗口 ID），窗口 D、F
+  assert_eq(labels[0].letter, "A")
+  assert_eq(labels[0].window_id, "")
+  assert_eq(labels[1].letter, "S")
+  assert_eq(labels[1].window_id, "")
+  assert_eq(labels[2].letter, "D")
+  assert_eq(labels[2].window_id, "w1")
+  assert_eq(labels[3].letter, "F")
+  assert_eq(labels[3].window_id, "w2")
+}
+
+///|
+test "固定未启动的应用要按两次才启动" {
+  let session = @core.Session::new()
+  // 一个固定着但没启动的应用（没有窗口），后面跟一个真窗口
+  let slots = @core.parse_slots(
+    "\t系统设置\tsystemsettings\t\nw1\t编辑器\tkate\t\n",
+  )
+  ignore(session.begin_tasks(@core.parse_tasks("w1\t编辑器窗口\tkate")))
+  ignore(session.set_slots(slots))
+  let token = session.token()
+  // 快照里第一条就是启动器条目：没有标题、第 5 列为 1
+  let snap = session.snapshot()
+  // 启动器槽位没有窗口 ID（这点决定了后面能不能认出它是启动器）
+  assert_eq(slots[0].ids.length(), 0)
+  assert_eq(slots[1].ids.length(), 1)
+  assert_true(snap.contains("A\t系统设置\tsystemsettings\t\t1"))
+  // 第一次按 A：进冷却，仍停在选择里，而且不该有启动请求
+  assert_eq(session.handle_key(token, "A"), @core.Arm("A"))
+  assert_true(session.is_selecting())
+  assert_eq(session.take_launch(), "")
+  // 第二次按 A：这才是启动
+  assert_eq(session.handle_key(token, "A"), @core.Launch("A"))
+  assert_eq(session.take_launch(), "A")
+}
+
+///|
+test "冷却中按别的字母不会误启动" {
+  let session = @core.Session::new()
+  let slots = @core.parse_slots(
+    "\t系统设置\tsystemsettings\t\nw1\t编辑器\tkate\t\n",
+  )
+  ignore(session.begin_tasks(@core.parse_tasks("w1\t编辑器窗口\tkate")))
+  ignore(session.set_slots(slots))
+  let token = session.token()
+  assert_eq(session.handle_key(token, "A"), @core.Arm("A"))
+  // S 是那个真窗口：应当正常激活，且不留下启动请求
+  assert_eq(session.handle_key(token, "S"), @core.Activate("w1"))
+  assert_eq(session.take_launch(), "")
+}
+
+///|
+test "冷却到期回初始但仍停在选择里" {
+  let session = @core.Session::new()
+  let slots = @core.parse_slots(
+    "\t系统设置\tsystemsettings\t\nw1\t编辑器\tkate\t\n",
+  )
+  ignore(session.begin_tasks(@core.parse_tasks("w1\t编辑器窗口\tkate")))
+  ignore(session.set_slots(slots))
+  let token = session.token()
+  assert_eq(session.handle_key(token, "A"), @core.Arm("A"))
+  assert_eq(session.handle_expire(token), @core.Expire)
+  assert_true(session.is_selecting())
+  assert_eq(session.take_launch(), "")
 }
 
 ///|
@@ -279,7 +338,7 @@ test "快照带出应用名与图标名" {
   ignore(session.set_slots(slots))
   assert_eq(
     session.snapshot(),
-    "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题",
+    "selecting:t1:A=w1\nA\t飞书\tfeishu\t窗口标题\t",
   )
 }
 
