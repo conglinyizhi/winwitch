@@ -68,10 +68,13 @@ if [ -f "$here/scripts/ensure-panel.js" ]; then
 fi
 
 echo "重启 helper 与浮层"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/winwitch"
+# 必须先建目录：全新用户没有它，而 set -e 会在重定向失败时中止整个脚本，
+# helper 就永远起不来（本机测不出来，因为目录早就在了）
+mkdir -p "$state_dir"
 pkill -x winwitch 2>/dev/null || true
-: > "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/helper.log"
-setsid nohup stdbuf -oL "$bin_dir/winwitch" \
-    > "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/helper.log" 2>&1 </dev/null &
+: > "$state_dir/helper.log"
+setsid nohup stdbuf -oL "$bin_dir/winwitch" > "$state_dir/helper.log" 2>&1 </dev/null &
 sleep 2
 pgrep -x winwitch >/dev/null && echo "helper 已启动" || echo "helper 未启动，看上面的日志"
 
@@ -87,7 +90,7 @@ if [ "$n_ovl" -ge 1 ]; then
     echo "浮层已启动（实例数 $n_ovl，应为 1）"
 else
     echo "浮层未起来，日志最后几行：" >&2
-    tail -8 "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/overlay.log" 2>/dev/null >&2 || true
+    tail -8 "$state_dir/overlay.log" 2>/dev/null >&2 || true
 fi
 
 cat <<'TIP'
