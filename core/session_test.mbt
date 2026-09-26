@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 ///|
 test "新会话处于空闲" {
   let session = @core.Session::new()

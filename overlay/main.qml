@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Window
 import org.kde.plasma.plasma5support as P5Support

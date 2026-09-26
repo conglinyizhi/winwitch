@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 生成「这是哪一份构建」的标识，落成文本，供 make status 和排障时对号。
 #
 # 为什么需要：这轮反复出现「我验的版本」和「提督打开的那份」不是同一个——

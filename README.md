@@ -264,3 +264,5 @@ make reload           # 让 KWin 与 plasmashell 重新加载
 ## 许可
 
 GPL-3.0-or-later，见 [LICENSE](LICENSE)。
+
+Copyright (C) 2026 conglinyizhi <conglinyizhi@qq.com>

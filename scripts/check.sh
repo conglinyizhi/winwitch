@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 提交前的静态检查。
 #
 # 收在这里的都是真踩过的坑，不是风格洁癖。

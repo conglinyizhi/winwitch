@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """给 winwitch 面板组件写一个配置键。
 
     scripts/set-panel-key.py <appletsrc> <键> <值>

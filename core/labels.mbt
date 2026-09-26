@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 ///|
 /// 一个窗口的元信息。标题与应用标识由 KWin 侧提供，用来在界面上说明
 /// 「这个字母对应哪个窗口」。

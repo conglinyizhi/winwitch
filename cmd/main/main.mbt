@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // 会话总线服务：字母选择会话的唯一权威。
 //
 // KWin 通过 D-Bus 驱动它，Plasma 任务栏组件通过 D-Bus 查询标签。

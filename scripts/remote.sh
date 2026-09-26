@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 把编译、测试、安装放到另一台机器上跑，本机只负责编辑源码。
 #
 #   scripts/remote.sh sync             只同步源码

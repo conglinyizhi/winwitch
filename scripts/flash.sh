@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 闪测：唤醒一次浮层，短暂显示后自动收掉。
 #
 # 为什么是脚本而不是浮层里的「调试模式」：调试用的东西不该长在正式功能里。

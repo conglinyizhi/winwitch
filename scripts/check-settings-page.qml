@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // 无头重演 KCM 初始化设置页，专抓「控件在初始化时把配置值冲掉」这类问题。
 //
 // 为什么需要它：设置页只能人工在 Plasma 里点开，脚本打不开（internalAction 不在

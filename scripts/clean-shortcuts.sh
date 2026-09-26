@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 清掉废弃的快捷键条目。
 #
 # 背景：早先给 26 个字母各注册了一个 `Meta+F, X` 序列，还注册了 `Meta+F, Escape`。

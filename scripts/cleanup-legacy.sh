@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 清掉历次改名留下的旧名遗留物。
 #
 # 项目改过两次名字：letterswitch（字母切窗）→ windownavigator（窗口导航器）→ winwitch（WinWitch）。

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 量一次启动器冷却的实际时长：按字母进冷却，轮询快照里 @armed 消失的时刻。
 # 验收「启动器确认时间」设置是否真的生效，不依赖人眼。
 #   用法：scripts/measure-armed.sh [字母]

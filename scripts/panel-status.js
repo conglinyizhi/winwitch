@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // 报告面板上有几个本项目的组件（顺序源应当恰好一个）。
 var panelsList = panels();
 var mine = [];

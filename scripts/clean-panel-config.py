@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """删掉面板配置里指向旧包 ID 的组件段。
 
 背景：改名之后，面板配置里仍留着旧 ID 的条目。这种条目在 Plasma 里是「加载失败的占位」，

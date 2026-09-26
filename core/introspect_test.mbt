@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 ///|
 test "自省 XML 声明了全部对外方法" {
   let xml = @core.introspection_xml()

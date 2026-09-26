@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 ///|
 /// 会话阶段。只有两个状态，任何其它状态都是 bug。
 pub(all) enum Phase {

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 安装WinWitch：helper（D-Bus 会话服务）+ KWin 脚本 + 浮层进程。只写用户目录。
 set -euo pipefail
 

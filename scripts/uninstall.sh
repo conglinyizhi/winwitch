@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 卸载WinWitch。只删本项目安装的东西，不动其它 Plasma / KWin 配置。
 set -euo pipefail
 

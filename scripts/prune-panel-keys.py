@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """删掉面板配置里已被设置页废弃的键。
 
 为什么必须清：KCM 加载「外观」设置页时，会拿配置里的每个键去找页面上对应的

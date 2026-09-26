@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // 确保面板上有「顺序源」组件，且没有本项目的其它旧组件。
 //
 // 顺序源必须是面板组件：只有 plasmashell 进程内的 QML 能读任务模型

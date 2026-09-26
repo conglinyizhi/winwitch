@@ -4,6 +4,8 @@ version = "0.1.0"
 
 readme = "README.md"
 
+repository = "https://github.com/conglinyizhi/winwitch"
+
 license = "GPL-3.0-or-later"
 
 keywords = [ "kde", "plasma", "kwin", "window-switcher" ]

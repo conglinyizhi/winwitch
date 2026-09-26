@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 conglinyizhi <conglinyizhi@qq.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # 重新装载与冒烟测试。
 #
 # 浮层是独立进程，改了它的 QML 只要重启这个进程就行，不必再重启 plasmashell
