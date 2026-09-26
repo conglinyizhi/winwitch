@@ -376,3 +376,30 @@ test "没有配置时不出现 @config 行" {
   ignore(session.begin(["w1"]))
   assert_eq(session.snapshot(), "selecting:t1:A=w1")
 }
+
+///|
+test "按过键之后窗口集合变化不再重排字母" {
+  let session = @core.Session::new()
+  let slots = @core.parse_slots(
+    "w1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t\n",
+  )
+  ignore(
+    session.begin_tasks(
+      @core.parse_tasks("w1\t编辑器\tkate\nw2\t浏览器\tfirefox"),
+    ),
+  )
+  ignore(session.set_slots(slots))
+  let token = session.token()
+  let before = session.snapshot()
+  // 按一个不对应的键：只表示"用户已经动手了"，不结束这次选择
+  assert_eq(session.handle_key(token, "Z"), @core.Ignore)
+  // 窗口集合变了（比如启动的应用把自己弹出来）：字母表必须冻结
+  ignore(
+    session.set_slots(
+      @core.parse_slots(
+        "w9\t系统设置\tx\t\nw1\t编辑器\tkate\t\nw2\t浏览器\tfirefox\t",
+      ),
+    ),
+  )
+  assert_eq(session.snapshot(), before)
+}

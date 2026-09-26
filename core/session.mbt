@@ -40,6 +40,10 @@ pub(all) struct Session {
   mut slots : Array[Slot]
   mut pending : String
   // 冷却中的启动器字母（固定着但没启动的应用要按两次），"" = 不在冷却
+  /// 本次选择里用户是否已经按过键。按过之后字母表必须冻结：
+  /// 选择期间窗口集合会变（启动的应用把自己弹出来），当场重排会让
+  /// "手指还按着的那个字母"含义突变，表现成各种说不清的异常。
+  mut keys_seen : Bool
   mut armed : String
   // 待启动的启动器字母：面板取走后清空（launcher URL 在面板手里）
   mut launch : String
@@ -50,6 +54,7 @@ pub(all) struct Session {
 pub fn Session::new() -> Session {
   {
     phase: Idle,
+    keys_seen: false,
     armed: "",
     launch: "",
     token: "t0",
@@ -251,7 +256,9 @@ pub fn Session::set_slots(
   alphabet? : String = default_alphabet,
 ) -> Array[Label] {
   self.slots = slots
-  if self.phase is Selecting {
+  // 只在用户还没动手时对齐任务栏顺序；一旦按过键，字母表冻结，
+  // 免得手指底下的字母在一声 D-Bus 之后换了意思。
+  if self.phase is Selecting && not(self.keys_seen) {
     self.relabel_by_slots(slots, alphabet)
   }
   self.labels
@@ -261,6 +268,7 @@ pub fn Session::set_slots(
 /// 清空状态并作废当前 token。取消与超时都走这里。
 pub fn Session::clear(self : Session) -> Unit {
   self.armed = ""
+  self.keys_seen = false
   self.phase = Idle
   self.labels = []
   self.tasks = []
@@ -283,6 +291,8 @@ pub fn Session::handle_key(
   if self.phase is Idle {
     return Ignore
   }
+  // 从这一刻起字母表冻结，窗口集合再变也不重排（见 set_slots）
+  self.keys_seen = true
   if key == "Escape" || key == "Esc" {
     return self.handle_cancel(token)
   }
