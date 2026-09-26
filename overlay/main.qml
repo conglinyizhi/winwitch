@@ -29,6 +29,8 @@ Window {
     // 走空饼图由 armedProgress 驱动（不显示数字）。
     property string armedLetter: ""
     property real armedProgress: 1.0
+    // 当前前台那张卡片的底色：比普通卡片亮一档，表达「你现在在这里」
+    readonly property color cardFrontColor: Qt.rgba(0.22, 0.34, 0.46, 0.92)
     readonly property bool armedActive: armedLetter !== ""
     // 由面板推来的配置赋值（设置页「行为」分类里的启动器确认时间）
     property int armedMillis: 1200
@@ -39,7 +41,8 @@ Window {
     readonly property string selectingPrefix: "selecting:"
     readonly property string idlePrefix: "idle:"
 
-    readonly property int cardWidth: Math.round(Kirigami.Units.gridUnit * 13)
+    // 基准卡宽；实际宽度由列数决定（见下面 cardWidth），放不下就缩窄
+    readonly property int baseCardWidth: Math.round(Kirigami.Units.gridUnit * 13)
     readonly property int cardHeight: Math.round(Kirigami.Units.gridUnit * 3.1)
     readonly property int cardMargin: Math.round(Kirigami.Units.smallSpacing * 1.2)
     readonly property int iconSize: cardHeight - cardMargin * 2
@@ -47,10 +50,19 @@ Window {
     readonly property int cardSpacing: Math.round(Kirigami.Units.smallSpacing)
     readonly property int cardPadding: Kirigami.Units.smallSpacing * 2
 
-    // 每行最多放几张卡片，避免宽屏上排成一条长龙。
-    readonly property int maxColumns: Math.max(1, Math.min(
-        Math.min(overlay.maxColumnsSetting, 8),
-        Math.floor((screen.width * 0.7) / (cardWidth + cardSpacing))))
+    // 每行最多放几张卡片。用户设置在设置页里说了算（上限 8），不再让屏幕宽度
+    // 悄悄把它压小——那会造成「我填了 8，6 个东西还是换行」这种看不懂的现象。
+    // 屏幕放不下时改为把卡片缩窄，保证填几列就是几列。
+    readonly property int maxColumns: Math.max(1, Math.min(overlay.maxColumnsSetting, 8))
+    // screen 在某些上下文里可能取不到，兜底避免 Math.floor(NaN) 把列数变成 NaN
+    readonly property int screenWidth: (typeof screen !== "undefined" && screen && screen.width > 0)
+                                        ? screen.width
+                                        : 1920
+    readonly property int cardWidth: Math.max(
+        Math.round(Kirigami.Units.gridUnit * 8),
+        Math.min(overlay.baseCardWidth,
+                 Math.floor((Math.floor(screenWidth * 0.92) - (maxColumns - 1) * cardSpacing)
+                            / maxColumns)))
     readonly property int columns: Math.max(1, Math.min(maxColumns, rows.length))
     readonly property int gridWidth: columns * cardWidth + (columns - 1) * cardSpacing
 
@@ -464,8 +476,6 @@ Window {
         anchors.fill: parent
         radius: Kirigami.Units.smallSpacing
         color: overlay.shellColor
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.16)
 
         Flow {
             id: grid
@@ -483,15 +493,39 @@ Window {
 
                     required property var modelData
 
+                    // 状态用「实体感」表达，不靠色相：
+                    //   亮着 = 当前前台，暗着 = 已最小化，空着 = 固定未启动
+                    readonly property bool isEmptySlot: card.modelData.isLauncher
+                    readonly property bool isFront: card.modelData.state === "a"
+
                     width: overlay.cardWidth
                     height: overlay.cardHeight
                     radius: 4
-                    color: cardArea.containsMouse ? overlay.cardHoverColor : overlay.cardColor
+                    color: card.isEmptySlot
+                           ? "transparent"
+                           : (cardArea.containsMouse
+                              ? overlay.cardHoverColor
+                              : (card.isFront ? overlay.cardFrontColor : overlay.cardColor))
                     // 已最小化的窗口压暗；冷却进行中再把其他卡片压得更暗，
                     // 视线只留在一个上。两个条件相乘，别互相盖掉。
                     opacity: (overlay.armedActive
                               && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0)
                              * (card.modelData.state === "m" ? 0.55 : 1.0)
+
+                    // 空位的虚线轮廓：Rectangle 画不了虚线，用 Canvas
+                    Canvas {
+                        anchors.fill: parent
+                        visible: card.isEmptySlot
+
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            ctx.reset();
+                            ctx.strokeStyle = "rgba(190, 200, 215, 0.7)";
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([6, 5]);
+                            ctx.strokeRect(1, 1, width - 2, height - 2);
+                        }
+                    }
                     // 启动器条目（固定着但没启动）：先靠描边区别出来，
                     // 按一次之后它会浮出倒计时饼图
                     // 描边优先级：启动器（灰蓝，按两次才启动）> 当前前台（金色）
@@ -512,6 +546,7 @@ Window {
 
                             Kirigami.Icon {
                                 anchors.fill: parent
+                                opacity: card.isEmptySlot ? 0.55 : 1.0
                                 // 图标名可能是主题名，也可能是绝对路径（desktop 文件里直接写的文件），
                                 // 后者要转成 URL 才能被 Icon 加载。
                                 source: overlay.iconSource(card.modelData.iconName)
