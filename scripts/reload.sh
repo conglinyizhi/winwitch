@@ -11,7 +11,7 @@ repo="$(cd "$here/.." && pwd)"
 bin="$HOME/.local/bin/winwitch"
 overlay_bin="$HOME/.local/bin/winwitch-overlay"
 data_dir="$HOME/.local/share/winwitch"
-kwin_id="winwitch"
+kwin_id="io.github.conglinyizhi.winwitch.kwin"
 
 say() { printf '\n=== %s ===\n' "$*"; }
 
@@ -30,10 +30,10 @@ kpackagetool6 --type KWin/Script --install "$repo/kwin" >/dev/null
 # reconfigure 不会重载已重装过的脚本，但也不能用 Scripting.unloadScript + loadScript：
 # 那样会留下僵尸动作（旧动作仍在 kglobalaccel，新实例同名注册被拒，触发没反应）。
 # 正确做法是开关一次插件，让 KWin 自己卸载旧实例、加载新实例。
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled false
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled false
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 1
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled true
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 2
 

@@ -16,7 +16,7 @@ LEGACY_PLASMOID_IDS=(
     io.github.conglinyizhi.windownavigator.panel
     io.github.conglinyizhi.windownavigator.strip
 )
-LEGACY_KWIN_IDS=(letterswitch windownavigator)
+LEGACY_KWIN_IDS=(letterswitch windownavigator winwitch)
 LEGACY_BIN_NAMES=(
     letterswitch
     letterswitch-overlay

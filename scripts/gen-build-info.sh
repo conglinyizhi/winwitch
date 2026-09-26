@@ -23,7 +23,7 @@ fi
 # 已安装的产物：这些文件的内容一起决定「这是哪一份」
 artifacts=(
     "$HOME/.local/bin/winwitch"
-    "$HOME/.local/share/kwin/scripts/winwitch/contents/code/main.js"
+    "$HOME/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin/contents/code/main.js"
     "$HOME/.local/share/winwitch/overlay/main.qml"
     "$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/contents/ui/main.qml"
     "$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/contents/ui/configGeneral.qml"

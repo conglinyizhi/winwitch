@@ -236,3 +236,31 @@ scripts/        安装、重载、卸载
 ```
 
 `moondbus` 目前只解出字符串与 u32，所以整套 IPC 刻意只用字符串，两端都不解析整数。
+
+## 安装
+
+```bash
+git clone https://github.com/conglinyizhi/winwitch
+cd winwitch
+make install          # 编译 helper、装 KWin 脚本与面板组件
+make reload           # 让 KWin 与 plasmashell 重新加载
+```
+
+装完还需要两步（一次性的）：
+
+1. 把 **WinWitch** 面板组件加到任务栏——它负责提供任务栏顺序与应用图标，
+   没有它字母就对不上图标位置
+2. 快捷键默认 `Meta+F`，可在系统设置里改
+
+只想快速试一次：`make flash`。要退出：`make cancel`（浮层刻意不设自动超时）。
+
+## 依赖
+
+- KDE Plasma 6 / Wayland
+- MoonBit 工具链（**建议用每夜构建**：`MOONBIT_INSTALL_VERSION=nightly`。
+  本项目在 `0.1.20260923` 上开发，稳定版可能缺语言特性）
+- `qdbus6`（`qttools`）、`kpackagetool6`、一个能跑 QML 的 Qt6 运行时
+
+## 许可
+
+GPL-3.0-or-later，见 [LICENSE](LICENSE)。

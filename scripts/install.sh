@@ -47,15 +47,15 @@ echo "已安装 $autostart_dir/winwitch-helper.desktop"
 say "3/5 安装 KWin 脚本"
 # 先移除再安装：旧的坏 metadata 会让 --upgrade 自己认不出包。
 kpackagetool6 --type KWin/Script --remove winwitch >/dev/null 2>&1 || true
-rm -rf "$HOME/.local/share/kwin/scripts/winwitch"
+rm -rf "$HOME/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin"
 kpackagetool6 --type KWin/Script --install "$repo/kwin" >/dev/null
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled true
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled true
 # 重载插件管理的脚本：开关一次插件，让 KWin 卸载旧实例并加载新实例。
 # 不要用 Scripting.unloadScript + loadScript，那会留下僵尸动作。
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled false
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled false
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 sleep 1
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled true
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
     || echo "提示：KWin 重载失败，注销后重新登录即可生效。"
 sleep 1

@@ -40,6 +40,23 @@ main() {
     done
     # shellcheck disable=SC2029
     ssh "$REMOTE" "export PATH=\$HOME/.moon/bin:\$PATH; cd \"\$HOME/$DEST\" && $cmd"
+
+    # 装完/重载完顺手确认浮层还在跑。踩过四次「改了没生效」，其中两次是
+    # 浮层进程根本没起来——helper 那边完全看不出异常，只有人到屏幕前才发现。
+    case "$cmd" in
+        *"make install"* | *"make reload"*)
+            if ! ssh "$REMOTE" "pgrep -f '[w]inwitch/overlay/main.qml' >/dev/null"; then
+                # shellcheck disable=SC2029
+                ssh "$REMOTE" "systemd-run --user --unit=wx-main --collect \"\$HOME/.local/bin/winwitch-overlay\" >/dev/null 2>&1" || true
+                sleep 3
+                if ssh "$REMOTE" "pgrep -f '[w]inwitch/overlay/main.qml' >/dev/null"; then
+                    echo "提示：浮层原本没在跑，已自动拉起"
+                else
+                    echo "警告：浮层没起来，手动查 journalctl --user -u wx-main" >&2
+                fi
+            fi
+            ;;
+    esac
 }
 
 main "$@"

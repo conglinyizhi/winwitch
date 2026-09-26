@@ -68,7 +68,7 @@ shortcut: ## 设置入口快捷键（用法：make shortcut KEYS=Meta+F）
 		"$(KEYS),none,显示窗口字母标签并进入选择模式"
 	qdbus6 org.kde.KWin /KWin reconfigure >/dev/null
 	@echo "入口快捷键已设为 $(KEYS)"
-	@echo "注意：这只改了生效值。脚本里的默认值在 kwinrc 的 Script-winwitch/shortcutPrefix"
+	@echo "注意：这只改了生效值。脚本里的默认值在 kwinrc 的 Script-io.github.conglinyizhi.winwitch.kwin/shortcutPrefix"
 
 .PHONY: shortcut
 cancel: ## 撤销当前选择模式（没有自动超时，卡住时用这个）
@@ -98,7 +98,7 @@ status: ## 查看当前状态：构建标识、进程、顺序源、D-Bus 状态
 		|| echo "  还没有配置推过来"
 	@echo "== KWin 脚本 =="
 	@timeout 8 qdbus6 org.kde.KWin /Scripting \
-		org.kde.kwin.Scripting.isScriptLoaded winwitch 2>&1
+		org.kde.kwin.Scripting.isScriptLoaded io.github.conglinyizhi.winwitch.kwin 2>&1
 	@echo "== 面板 =="
 	@timeout 10 qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
 		"$$(cat $(REPO)/scripts/panel-status.js)" 2>&1 | tail -1 || echo "  plasmashell 不可达"

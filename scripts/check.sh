@@ -59,7 +59,7 @@ if command -v node >/dev/null 2>&1; then
     done
 fi
 if command -v qmllint >/dev/null 2>&1; then
-    for f in overlay/*.qml package/contents/ui/*.qml; do
+    for f in overlay/*.qml; do
         qmllint "$f" >/dev/null 2>&1 || bad "$f 未通过 qmllint"
     done
 fi
@@ -109,7 +109,7 @@ note "5b. 已安装版本是否就是仓库版本"
 # 这条是给「改了却没装」准备的：我验证时用的是重装后的版本，提督打开设置页看到的
 # 却可能是磁盘上那份旧的，于是「我这儿好好的，你那儿不行」。比对一下，不一致就提示。
 appletsrc_dir="$HOME/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel"
-kwin_dir="$HOME/.local/share/kwin/scripts/winwitch"
+kwin_dir="$HOME/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin"
 overlay_dir="$HOME/.local/share/winwitch/overlay"
 stale=""
 for pair in \

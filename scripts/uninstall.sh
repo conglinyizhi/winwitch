@@ -5,11 +5,11 @@ set -euo pipefail
 say() { printf '%s\n' "$*"; }
 
 say "== 停用 KWin 脚本 =="
-kwriteconfig6 --file kwinrc --group Plugins --key winwitchEnabled false
+kwriteconfig6 --file kwinrc --group Plugins --key io.github.conglinyizhi.winwitch.kwinEnabled false
 qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 
 say "== 卸载 KWin 脚本 =="
-kpackagetool6 --type KWin/Script --remove winwitch 2>/dev/null || say "（未安装，跳过）"
+kpackagetool6 --type KWin/Script --remove io.github.conglinyizhi.winwitch.kwin 2>/dev/null || kpackagetool6 --type KWin/Script --remove winwitch 2>/dev/null || say "（未安装，跳过）"
 
 say "== 卸载任务栏组件 =="
 kpackagetool6 --type Plasma/Applet --remove io.github.conglinyizhi.winwitch.strip 2>/dev/null || say "（未安装，跳过）"
