@@ -172,12 +172,28 @@ fn main {
           println("winwitch: 已连接会话总线，唯一名 \{unique}")
         Err(code) => println("winwitch: Hello 握手失败，错误码 \{code}")
       }
-      match server.request_name(service_name, 0) {
-        Ok(_) => println("winwitch: 已申请名称 \{service_name}")
-        Err(code) =>
+      // flags=4 是 DBUS_NAME_FLAG_DO_NOT_QUEUE：名字被占就立刻失败，不排队等。
+      // 排队的话会留下一个拿不到名字、状态却各自演进的僵尸服务；等先来的那个
+      // 退出，它接手 D-Bus 名字时带着一份陈旧状态，面板和浮层就跟它对话了。
+      match server.request_name(service_name, 4) {
+        Ok(code) => {
+          // 返回的是 D-Bus 的结果码，不是"成功与否"：
+          // 1 = PRIMARY_OWNER（真拿到了），2 = IN_QUEUE，3 = ALREADY_OWNER，4 = EXISTS。
+          // flags=4 表示不排队，名字被占时总线回 4，而这是正常回复，必须自己判码。
+          if code != 1 {
+            println(
+              "winwitch: 名称 \{service_name} 已被占用（结果码 \{code}），本实例退出",
+            )
+            return
+          }
+          println("winwitch: 已申请名称 \{service_name}")
+        }
+        Err(code) => {
           println(
-            "winwitch: 申请名称 \{service_name} 失败，错误码 \{code}；KWin 将无法调用本服务",
+            "winwitch: 申请名称 \{service_name} 出错（错误码 \{code}），本实例退出",
           )
+          return
+        }
       }
       let session = @core.Session::new()
       println("winwitch: 就绪，对象路径 \{object_path}")
