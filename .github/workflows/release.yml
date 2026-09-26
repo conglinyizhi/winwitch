@@ -65,6 +65,12 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           # 发布说明保持简短、英文优先：长文案没人看，还容易过期
           notes="Letters for windows. Press Meta+F, then one letter. Install: unpack, run ./install.sh. See README for the two manual steps (panel widget, shortcut)."
+          # 带连字符的 tag 是语义版本里的预发布（如 v0.1.2-rc-1）：
+          # 标成 prerelease，GitHub 就不会把它推给普通用户
+          extra=""
+          case "$GITHUB_REF_NAME" in
+            *-*) extra="--prerelease" ;;
+          esac
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz \
-            --title "WinWitch $GITHUB_REF_NAME" --notes "$notes" \
+            --title "WinWitch $GITHUB_REF_NAME" --notes "$notes" $extra \
           || gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz --clobber
