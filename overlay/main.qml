@@ -217,10 +217,10 @@ Window {
             // 明细行：字母、应用名、图标名、窗口标题。
             // 另有一行 @config=... 承载外观配置，不是窗口。
             var parsed = [];
-            overlay.armedLetter = "";
+            var armedNow = "";
             for (var j = 1; j < lines.length; j++) {
                 if (lines[j].indexOf("@armed=") === 0) {
-                    overlay.armedLetter = lines[j].substring("@armed=".length).trim();
+                    armedNow = lines[j].substring("@armed=".length).trim();
                     continue;
                 }
                 // 启动请求交给面板执行（launcher URL 在面板手里），浮层只负责显示
@@ -242,6 +242,14 @@ Window {
                     });
                 }
             }
+            // 只在真正变化时赋值。每次轮询都重设一遍的话，expiry 计时器会随
+            // running 抖动被反复重启（1200ms 追不上 500ms 的轮询），
+            // 冷却永远烧不完，饼图也每次被拨回满格。
+            if (overlay.armedLetter !== armedNow) {
+                overlay.armedLetter = armedNow;
+                overlay.armedProgress = 1.0;
+            }
+
             // helper 没给明细时，至少把字母显示出来
             if (parsed.length === 0) {
                 for (var k = 0; k < letters.length; k++) {
@@ -389,11 +397,6 @@ Window {
         onNewData: function (sourceName) {
             noteSource.disconnectSource(sourceName);
         }
-    }
-
-    // 冷却开始：饼图从满开始走空
-    onArmedLetterChanged: {
-        overlay.armedProgress = 1.0;
     }
 
     // 冷却作废（超时或用户按了别的字母）：告诉 helper 撤销，选择模式继续
