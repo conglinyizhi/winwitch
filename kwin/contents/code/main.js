@@ -96,9 +96,15 @@ function windowIdOf(win) {
     return String(win.internalId);
 }
 
+// 弹出浮层之前谁是活动窗口。判断「这次选的是不是当前前台」要用它，
+// 不能用动作那刻的实时焦点：浮层弹出、以及下面那个问开关的 D-Bus 往返，
+// 都可能已经改变了焦点，条件会莫名其妙不成立，于是本该最小化的变成普通激活。
+var activeWindowAtSelection = null;
+
 // Meta+F：每次都重新开始。helper 的 Begin 会换新 token 并重新分配字母，
 // 所以连按两次等于「按当前窗口列表重来」，不会留下半开状态。
 function beginSelection() {
+    activeWindowAtSelection = workspace.activeWindow;
     var windows = switchableWindows();
     var lines = [];
     for (var i = 0; i < windows.length; i++) {
@@ -158,7 +164,7 @@ function applyActivation(win, minimizeActive) {
             win.minimized = false;
             workspace.activeWindow = win;
             print("winwitch: 已恢复并激活 " + title);
-        } else if (win === workspace.activeWindow && minimizeActive) {
+        } else if (win === activeWindowAtSelection && minimizeActive) {
             win.minimized = true;
             print("winwitch: 已最小化 " + title);
         } else {
