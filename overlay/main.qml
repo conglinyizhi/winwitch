@@ -31,6 +31,7 @@ Window {
     property real armedProgress: 1.0
     // 当前前台那张卡片的底色：比普通卡片亮一档，表达「你现在在这里」
     readonly property color cardFrontColor: Qt.rgba(0.22, 0.34, 0.46, 0.92)
+    // 已最小化：底色暗一档。用底色区分，图标和字母保亮
     readonly property bool armedActive: armedLetter !== ""
     // 由面板推来的配置赋值（设置页「行为」分类里的启动器确认时间）
     property int armedMillis: 1200
@@ -497,16 +498,34 @@ Window {
                     width: overlay.cardWidth
                     height: overlay.cardHeight
                     radius: 4
+                    // 悬停不改色系，只在当前底色上提亮一档。
+                    // 原来悬停一律换成 cardHoverColor，淡蓝底那张鼠标一上去就"变了颜色"，
+                    // 「你现在在这里」这个信号在悬停瞬间断掉，看着别扭。
+                    // 底色统一：只有当前前台是淡蓝，其余一律常态底。
+                    // 「已最小化」不靠底色区分（多一种颜色语义只会让整屏更乱），
+                    // 它靠没有实线框来区分：已启动未最小化的卡片有 1px 实线，它没有。
+                    readonly property color baseColor: card.isEmptySlot
+                                                       ? "transparent"
+                                                       : (card.isFront
+                                                          ? overlay.cardFrontColor
+                                                          : overlay.cardColor)
+                    // 悬停提亮要按底色类型分开：
+                    //   淡蓝底是饱和色，提亮一档就好，色系不能变
+                    //   常态底是 6% 白，白色已是最亮，lighter 对它无效（所以之前"没效果"）
+                    //   那就用高一档的透明度（cardHoverColor），这才是视觉上真的变亮
                     color: card.isEmptySlot
                            ? "transparent"
                            : (cardArea.containsMouse
-                              ? overlay.cardHoverColor
-                              : (card.isFront ? overlay.cardFrontColor : overlay.cardColor))
+                              ? (card.isFront
+                                 ? Qt.lighter(card.baseColor, 1.3)
+                                 : overlay.cardHoverColor)
+                              : card.baseColor)
                     // 已最小化的窗口压暗；冷却进行中再把其他卡片压得更暗，
                     // 视线只留在一个上。两个条件相乘，别互相盖掉。
-                    opacity: (overlay.armedActive
-                              && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0)
-                             * (card.modelData.state === "m" ? 0.55 : 1.0)
+                    // 状态一律交给底色，不压内容：压暗会让图标和黄色字母看不清，
+                    // 那就失去了「一眼知道这是什么」的作用。只有冷却时才压整张卡。
+                    opacity: overlay.armedActive
+                             && card.modelData.letter !== overlay.armedLetter ? 0.4 : 1.0
 
                     // 空位的虚线轮廓：Rectangle 画不了虚线，用 Canvas
                     Canvas {
@@ -517,7 +536,7 @@ Window {
                             var ctx = getContext("2d");
                             ctx.reset();
                             ctx.strokeStyle = "rgba(190, 200, 215, 0.7)";
-                            ctx.lineWidth = 2;
+                            ctx.lineWidth = 1;
                             ctx.setLineDash([6, 5]);
                             ctx.strokeRect(1, 1, width - 2, height - 2);
                         }
@@ -525,8 +544,11 @@ Window {
                     // 启动器条目（固定着但没启动）：先靠描边区别出来，
                     // 按一次之后它会浮出倒计时饼图
                     // 描边优先级：启动器（灰蓝，按两次才启动）> 当前前台（金色）
-                    border.width: card.modelData.isLauncher ? 2 : 0
-                    border.color: card.modelData.isLauncher ? "#8ea0b5" : "#f5c542"
+                    // 三种状态各一种画法：未启动 = 1px 虚线（下面 Canvas 画），
+                    // 已启动 = 1px 实线围一圈，已最小化 = 不加框，只靠底色
+                    border.width: !card.isEmptySlot && card.modelData.state !== "m" ? 1 : 0
+                    // 细一点、白一点：半透明白，像一层提示而不是一个框
+                    border.color: "#8ce8ecf2"
 
                     Row {
                         anchors.fill: parent
@@ -542,7 +564,6 @@ Window {
 
                             Kirigami.Icon {
                                 anchors.fill: parent
-                                opacity: card.isEmptySlot ? 0.55 : 1.0
                                 // 图标名可能是主题名，也可能是绝对路径（desktop 文件里直接写的文件），
                                 // 后者要转成 URL 才能被 Icon 加载。
                                 source: overlay.iconSource(card.modelData.iconName)
