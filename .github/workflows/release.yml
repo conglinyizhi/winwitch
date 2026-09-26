@@ -60,6 +60,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 容器以 root 运行，检出目录属主不同；git 会拒绝操作，
+          # 而 gh release create 内部要调 git。这行不能省。
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           # 发布说明保持简短、英文优先：长文案没人看，还容易过期
           notes="Letters for windows. Press Meta+F, then one letter. Install: unpack, run ./install.sh. See README for the two manual steps (panel widget, shortcut)."
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz \
