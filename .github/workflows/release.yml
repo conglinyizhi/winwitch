@@ -39,8 +39,11 @@ jobs:
         run: |
           mkdir -p dist
           cp _build/native/release/build/cmd/main/main.exe dist/winwitch-helper
+          # 不放 scripts/install.sh：它假定有仓库布局和 MoonBit 工具链，
+          # 对拿预编译产物的用户是个陷阱（会在 moon build 那步失败）。
+          # 面向发布的手动安装步骤写在 README 的「From a release」一节。
           tar -czf "dist/winwitch-${GITHUB_REF_NAME#v}-addon.tar.gz" \
-            kwin panel overlay data scripts/install.sh scripts/reload.sh
+            kwin panel overlay data scripts/reload.sh
 
       - name: 挂到 Release
         env:

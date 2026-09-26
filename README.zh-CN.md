@@ -40,7 +40,22 @@ make reload      # 让 KWin 与 plasmashell 重新加载
 2. 默认快捷键是 `Meta+F`，想改就在系统设置里改。
 
 发布页同时提供静态链接的 helper 与配套文件（`*-addon.tar.gz`）。
-一键安装脚本还在计划里；在那之前，上面这条源码路线是受支持的方式。
+### 从发布包安装
+
+发布页上有两样东西：`winwitch-helper`（静态链接，不需要工具链）和
+`winwitch-<版本>-addon.tar.gz`（KWin 脚本、面板组件、浮层、自启动模板）。
+需要你自己放到位：
+
+- `winwitch-helper` → `~/.local/bin/winwitch`
+- `kwin/` → `~/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin/`
+- `panel/` → `~/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/`
+- `overlay/` → `~/.local/share/winwitch/overlay/`，另外 `~/.local/bin/winwitch-overlay`
+  （用 `overlay/winwitch-overlay.sh` 那个包装脚本，把 QML 路径填进去）
+- `data/*.desktop` → `~/.config/autostart/`，把里面的 `@HELPER@` / `@WRAPPER@` /
+  `@OVERLAY@` 换成上面的路径
+
+然后在 `kwinrc` 的 `Plugins` 组里把 `io.github.conglinyizhi.winwitch.kwinEnabled` 设为 true，
+并把面板组件加到任务栏。把这套流程写成脚本的事在计划里；今天更顺的还是源码路线。
 
 ## 使用
 

@@ -43,7 +43,23 @@ Two one-time steps after that:
 2. The default shortcut is `Meta+F`. Change it in System Settings if you prefer.
 
 Releases also ship a statically linked helper plus the add-on files (`*-addon.tar.gz`).
-A one-command installer is planned; until then the source route above is the supported one.
+### From a release
+
+The release page carries two things: `winwitch-helper` (statically linked, no toolchain
+needed) and `winwitch-<version>-addon.tar.gz` (KWin script, panel applet, overlay, and the
+autostart templates). You copy them into place yourself:
+
+- `winwitch-helper` → `~/.local/bin/winwitch`
+- `kwin/` → `~/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin/`
+- `panel/` → `~/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/`
+- `overlay/` → `~/.local/share/winwitch/overlay/`, plus `~/.local/bin/winwitch-overlay`
+  (the wrapper in `overlay/winwitch-overlay.sh`, with the QML path filled in)
+- `data/*.desktop` → `~/.config/autostart/`, replacing the `@HELPER@` / `@WRAPPER@` /
+  `@OVERLAY@` placeholders with the paths above
+
+Then enable the KWin script (`Plugins` → `io.github.conglinyizhi.winwitch.kwinEnabled=true`
+in `kwinrc`) and add the panel widget. A script that does all of this is planned; the
+source route above is the smoother one today.
 
 ## Usage
 
