@@ -31,6 +31,13 @@ LEGACY_AUTOSTART=(
 )
 LEGACY_DATA_DIRS=(letterswitch windownavigator)
 LEGACY_SHORTCUT_PREFIXES=("字母切窗 " "窗口导航器 ")
+# 同一个插件名下曾经注册、现在代码里已经没有的动作名。
+# KGlobalAccel 会把它们一直留在注册表里（只有 KWin 重启才清），没有按键的留着无害，
+# 但带按键的会继续抢键 —— 「按什么都没反应」就是这么来的。
+LEGACY_SHORTCUT_NAMES=(
+    "winwitch 探针"
+    "winwitch 调试预览"
+)
 
 # ── 执行 ───────────────────────────────────────────────────
 say() { printf '  %s\n' "$*"; }
@@ -94,6 +101,13 @@ if [ -f "$rc" ]; then
             say "已删除快捷键条目 $key"
             removed=$((removed + 1))
         done < <(grep -oP "^${prefix}[^=]+" "$rc" 2>/dev/null || true)
+    done
+    # 精确动作名（同一插件名下废弃的那些）
+    for name in "${LEGACY_SHORTCUT_NAMES[@]}"; do
+        [ -n "$(kreadconfig6 --file kglobalshortcutsrc --group kwin --key "$name" 2>/dev/null)" ] || continue
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "$name" --delete 2>/dev/null || true
+        say "已删除快捷键条目 $name"
+        removed=$((removed + 1))
     done
 fi
 
