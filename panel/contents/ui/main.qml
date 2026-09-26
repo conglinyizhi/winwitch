@@ -206,7 +206,13 @@ PlasmoidItem {
             if (file !== "") {
                 var cmd = "for d in \"$HOME/.local/share/applications\" /usr/share/applications "
                         + "/var/lib/flatpak/exports/share/applications; do "
-                        + "f=$d/" + file + "; [ -f \"$f\" ] && sed -n s/^Name=//p \"$f\" | head -1; done";
+                        // desktop 文件里只有英文 msgid；中文译文在 gettext 的 .mo 里。
+                        // 必须给完整 locale（LC_ALL=zh_CN.UTF-8），只给 LANGUAGE 取不到。
+                        + "f=$d/" + file + "; [ -f \"$f\" ] && { "
+                        + "n=$(sed -n s/^Name=//p \"$f\" | head -1); "
+                        + "LC_ALL=" + Qt.locale().name + ".UTF-8 "
+                        + "gettext -d \"$(basename \"$f\" .desktop)\" \"$n\" 2>/dev/null "
+                        + "|| printf %s \"$n\"; }; done";
                 root.pendingNames[cmd] = appId;
                 nameSource.connectSource(cmd);
             }
