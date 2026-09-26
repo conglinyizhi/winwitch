@@ -3,3 +3,5 @@ _build/
 .repos/
 target/
 *.zip
+# 发布流程的产物目录：在仓库里就地生成，不该被提交
+dist/
