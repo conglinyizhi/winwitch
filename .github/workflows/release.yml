@@ -44,18 +44,24 @@ jobs:
 
       - name: 准备发布资产
         run: |
-          mkdir -p dist
-          cp _build/native/release/build/cmd/main/main.exe dist/winwitch-helper
-          # 不放 scripts/install.sh：它假定有仓库布局和 MoonBit 工具链，
-          # 对拿预编译产物的用户是个陷阱（会在 moon build 那步失败）。
-          # 面向发布的手动安装步骤写在 README 的「From a release」一节。
-          tar -czf "dist/winwitch-${GITHUB_REF_NAME#v}-addon.tar.gz" \
-            kwin panel overlay data scripts/reload.sh
+          # 打成一个包：用户下载一次就够，不必在发布页上挑文件
+          ver="${GITHUB_REF_NAME#v}"
+          stage="dist/winwitch-$ver"
+          mkdir -p "$stage"
+          cp _build/native/release/build/cmd/main/main.exe "$stage/winwitch-helper"
+          cp -r kwin panel overlay data scripts "$stage/"
+          cp scripts/install-release.sh "$stage/install.sh"
+          chmod +x "$stage/install.sh"
+          tar -C dist -czf "dist/winwitch-$ver.tar.gz" "winwitch-$ver"
+          rm -rf "$stage"
+          ls -lh dist/
 
       - name: 挂到 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "$GITHUB_REF_NAME" --generate-notes \
-          || gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          # 发布说明保持简短、英文优先：长文案没人看，还容易过期
+          notes="Letters for windows. Press Meta+F, then one letter. Install: unpack, run ./install.sh. See README for the two manual steps (panel widget, shortcut)."
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz \
+            --title "WinWitch $GITHUB_REF_NAME" --notes "$notes" \
+          || gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz --clobber

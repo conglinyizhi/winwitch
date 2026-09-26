@@ -45,21 +45,16 @@ Two one-time steps after that:
 Releases also ship a statically linked helper plus the add-on files (`*-addon.tar.gz`).
 ### From a release
 
-The release page carries two things: `winwitch-helper` (statically linked, no toolchain
-needed) and `winwitch-<version>-addon.tar.gz` (KWin script, panel applet, overlay, and the
-autostart templates). You copy them into place yourself:
+The release page has one tarball. Unpack it and run:
 
-- `winwitch-helper` → `~/.local/bin/winwitch`
-- `kwin/` → `~/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin/`
-- `panel/` → `~/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/`
-- `overlay/` → `~/.local/share/winwitch/overlay/`, plus `~/.local/bin/winwitch-overlay`
-  (the wrapper in `overlay/winwitch-overlay.sh`, with the QML path filled in)
-- `data/*.desktop` → `~/.config/autostart/`, replacing the `@HELPER@` / `@WRAPPER@` /
-  `@OVERLAY@` placeholders with the paths above
+```bash
+tar -xzf winwitch-<version>.tar.gz
+cd winwitch-<version>
+./install.sh
+```
 
-Then enable the KWin script (`Plugins` → `io.github.conglinyizhi.winwitch.kwinEnabled=true`
-in `kwinrc`) and add the panel widget. A script that does all of this is planned; the
-source route above is the smoother one today.
+It installs the helper, the KWin script, the panel applet, the overlay and the autostart
+entries — no toolchain needed — then prints the two steps that touch your desktop settings.
 
 ## Usage
 
@@ -102,6 +97,19 @@ taskbar order, so the panel applet pushes the taskbar order to the helper and th
 assigns letters by slot. Once you press a key, the letter table freezes until that selection
 ends — otherwise a changing window set (an app launching itself, say) would re-label the
 letter under your finger.
+
+## Notes
+
+- **The panel widget has to stay on your taskbar.** It is what tells WinWitch your taskbar
+  order and gives it app icons and names. Without it the letters do not line up with your
+  icons, and pinned-app entries cannot show a name.
+- The default shortcut is `Meta+F`; change it under System Settings → Shortcuts → WinWitch.
+- **There is no auto-timeout.** The overlay stays until you press a letter or `Esc`.
+  If it ever seems stuck, `Esc` always exits.
+- The helper is autostarted. If `Meta+F` does nothing, check that `winwitch` is running —
+  the overlay draws the cards, the helper holds the state, and a dead one shows no error.
+- Wayland only. X11 is untested.
+- Building from source needs the MoonBit **nightly** toolchain (see Requirements).
 
 ## Development
 

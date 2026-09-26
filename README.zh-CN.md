@@ -42,20 +42,16 @@ make reload      # 让 KWin 与 plasmashell 重新加载
 发布页同时提供静态链接的 helper 与配套文件（`*-addon.tar.gz`）。
 ### 从发布包安装
 
-发布页上有两样东西：`winwitch-helper`（静态链接，不需要工具链）和
-`winwitch-<版本>-addon.tar.gz`（KWin 脚本、面板组件、浮层、自启动模板）。
-需要你自己放到位：
+发布页只有一个包。解包后运行：
 
-- `winwitch-helper` → `~/.local/bin/winwitch`
-- `kwin/` → `~/.local/share/kwin/scripts/io.github.conglinyizhi.winwitch.kwin/`
-- `panel/` → `~/.local/share/plasma/plasmoids/io.github.conglinyizhi.winwitch.panel/`
-- `overlay/` → `~/.local/share/winwitch/overlay/`，另外 `~/.local/bin/winwitch-overlay`
-  （用 `overlay/winwitch-overlay.sh` 那个包装脚本，把 QML 路径填进去）
-- `data/*.desktop` → `~/.config/autostart/`，把里面的 `@HELPER@` / `@WRAPPER@` /
-  `@OVERLAY@` 换成上面的路径
+```bash
+tar -xzf winwitch-<版本>.tar.gz
+cd winwitch-<版本>
+./install.sh
+```
 
-然后在 `kwinrc` 的 `Plugins` 组里把 `io.github.conglinyizhi.winwitch.kwinEnabled` 设为 true，
-并把面板组件加到任务栏。把这套流程写成脚本的事在计划里；今天更顺的还是源码路线。
+它会装好 helper、KWin 脚本、面板组件、浮层和自启动项（**不需要任何工具链**），
+然后打印出那两步需要你自己决定的桌面设置。
 
 ## 使用
 
@@ -95,6 +91,17 @@ Meta+F
 所以由面板把任务栏的图标顺序推给 helper，helper 按槽位分配字母。
 一旦你按下某个键，字母表就冻结到这次选择结束——否则窗口集合在操作期间变化
 （比如启动的应用把自己弹出来）会让手指底下的字母突然换意思。
+
+## 注意事项
+
+- **面板上必须常驻那个组件。** 它负责把你的任务栏顺序告诉 WinWitch，并提供应用图标与
+  名字。少了它，字母对不上图标位置，固定项条目也显示不出名字。
+- 默认快捷键 `Meta+F`，改的话在 系统设置 → 快捷键 → WinWitch。
+- **刻意没有自动超时。** 浮层会一直在，直到你按字母或 `Esc`。真遇到卡住，按 `Esc` 一定能退。
+- helper 是自启动的。如果 `Meta+F` 没反应，先看 `winwitch` 进程在不在——
+  浮层负责画卡片、helper 负责存状态，两者死掉都不会报错。
+- 只支持 Wayland，X11 未测。
+- 从源码构建需要 MoonBit 的**每夜版**（见「依赖」）。
 
 ## 开发
 
