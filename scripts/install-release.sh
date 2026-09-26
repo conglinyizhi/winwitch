@@ -48,15 +48,54 @@ sed -e "s|@OVERLAY@|$data_dir/overlay/main.qml|" -e "s|@WRAPPER@|$bin_dir/winwit
     "$here/data/winwitch-overlay.desktop" > "$autostart_dir/winwitch-overlay.desktop"
 chmod 644 "$autostart_dir"/winwitch-*.desktop
 
-echo "让 KWin 与 plasmashell 重新加载（面板会闪一下）"
-bash "$here/scripts/reload.sh" >/dev/null 2>&1 || true
+echo "让 KWin 重新加载脚本（开关一次插件，避免僵尸动作）"
+kwriteconfig6 --file kwinrc --group Plugins --key "${kwin_id}Enabled" false
+qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+sleep 1
+kwriteconfig6 --file kwinrc --group Plugins --key "${kwin_id}Enabled" true
+qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+sleep 2
+
+echo "重启 plasmashell 让面板组件生效（面板会闪一下）"
+# QML 改动后 plasmashell 会继续跑内存里的旧版本，必须清缓存再重启
+rm -rf "$HOME/.cache/plasmashell/qmlcache"
+systemctl --user restart plasma-plasmashell.service
+sleep 6
+if [ -f "$here/scripts/ensure-panel.js" ]; then
+    timeout 15 qdbus6 org.kde.plasmashell /PlasmaShell \
+        org.kde.PlasmaShell.evaluateScript "$(cat "$here/scripts/ensure-panel.js")" >/dev/null 2>&1 \
+        && echo "已把面板组件加到任务栏" || echo "面板组件没能自动添加，请手动加（见下方第 1 步）"
+fi
+
+echo "重启 helper 与浮层"
+pkill -x winwitch 2>/dev/null || true
+: > "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/helper.log"
+setsid nohup stdbuf -oL "$bin_dir/winwitch" \
+    > "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/helper.log" 2>&1 </dev/null &
+sleep 2
+pgrep -x winwitch >/dev/null && echo "helper 已启动" || echo "helper 未启动，看上面的日志"
+
+# 浮层的实际进程是 `/usr/lib/qt6/bin/qml …/overlay/main.qml`，不含包装脚本的名字，
+# 按包装脚本名去杀会匹配不到，于是每装一次就多留一个实例（多个浮层叠着）。
+# 而且必须在 KWin/plasmashell 重载之后才启动：先启动会被重载带走。
+pkill -f 'winwitch/overlay/main.qml' 2>/dev/null || true
+sleep 1
+setsid nohup "$bin_dir/winwitch-overlay" >/dev/null 2>&1 </dev/null &
+sleep 3
+n_ovl=$(pgrep -x qml -a 2>/dev/null | grep -c 'winwitch/overlay' || true)
+if [ "$n_ovl" -ge 1 ]; then
+    echo "浮层已启动（实例数 $n_ovl，应为 1）"
+else
+    echo "浮层未起来，日志最后几行：" >&2
+    tail -8 "${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/overlay.log" 2>/dev/null >&2 || true
+fi
 
 cat <<'TIP'
 
 装好了。还有两步要你手动做：
 
-  1. 把 WinWitch 面板组件加到任务栏
-     右键任务栏 → 编辑面板 → 添加组件 → 搜 WinWitch
+  1. 确认任务栏上有 WinWitch 面板组件（上面已尝试自动添加）
+     没有的话：右键任务栏 → 编辑面板 → 添加组件 → 搜 WinWitch
      它提供任务栏顺序与应用图标；少了它，字母就对不上你的图标位置
 
   2. 快捷键默认是 Meta+F，想改在 系统设置 → 快捷键 里找 WinWitch
