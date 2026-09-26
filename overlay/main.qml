@@ -58,11 +58,7 @@ Window {
     readonly property int screenWidth: (typeof screen !== "undefined" && screen && screen.width > 0)
                                         ? screen.width
                                         : 1920
-    readonly property int cardWidth: Math.max(
-        Math.round(Kirigami.Units.gridUnit * 8),
-        Math.min(overlay.baseCardWidth,
-                 Math.floor((Math.floor(screenWidth * 0.92) - (maxColumns - 1) * cardSpacing)
-                            / maxColumns)))
+    readonly property int cardWidth: overlay.baseCardWidth
     readonly property int columns: Math.max(1, Math.min(maxColumns, rows.length))
     readonly property int gridWidth: columns * cardWidth + (columns - 1) * cardSpacing
 
@@ -529,7 +525,7 @@ Window {
                     // 启动器条目（固定着但没启动）：先靠描边区别出来，
                     // 按一次之后它会浮出倒计时饼图
                     // 描边优先级：启动器（灰蓝，按两次才启动）> 当前前台（金色）
-                    border.width: card.modelData.isLauncher || card.modelData.state === "a" ? 2 : 0
+                    border.width: card.modelData.isLauncher ? 2 : 0
                     border.color: card.modelData.isLauncher ? "#8ea0b5" : "#f5c542"
 
                     Row {
