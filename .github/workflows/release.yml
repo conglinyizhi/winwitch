@@ -31,6 +31,11 @@ jobs:
           MOONBIT_INSTALL_VERSION=nightly bash /tmp/moon-install.sh
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      - name: 更新 Mooncakes registry 索引
+        # 全新环境里 moon 的 registry 索引是空的，不刷新就解析不到依赖，
+        # 报 "module was not found in the registry"。这一步不能省。
+        run: moon update
+
       - name: 检查与测试
         run: make ci
 
