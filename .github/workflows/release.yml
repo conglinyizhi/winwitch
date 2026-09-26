@@ -19,7 +19,9 @@ jobs:
     steps:
       - name: 安装依赖
         run: |
-          pacman -Syu --noconfirm --needed bash python nodejs qt6-declarative git github-cli
+          # base-devel 必需：它带来 make、gcc 和 binutils（ar）。
+          # archlinux 镜像只含 base，缺了它连 moon build 的原生后端都跑不起来。
+          pacman -Syu --noconfirm --needed base-devel bash python nodejs qt6-declarative git github-cli
 
       - uses: actions/checkout@v4
 
