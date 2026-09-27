@@ -24,4 +24,12 @@ fi
 log="${XDG_STATE_HOME:-$HOME/.local/state}/winwitch/overlay.log"
 mkdir -p "$(dirname "$log")"
 
+# 图标主题靠这两个变量认。缺了的话 Qt 不知道自己在 KDE 会话里，
+# 图标主题会退回 hicolor 这个兜底目录；而 Breeze 独有那些通用图标名
+# （preferences-system、utilities-terminal、hwinfo 之类）就一个都取不到。
+# 现象很有辨识度：只有一部分卡片没图标，而且没的那几张都是同一类名字。
+# autostart 路径本来就带这两个变量，这里是给手动/脚本拉起的情况兜底。
+export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-KDE}"
+export KDE_FULL_SESSION="${KDE_FULL_SESSION:-true}"
+
 exec stdbuf -oL -eL "$qml_runtime" "@OVERLAY@" >> "$log" 2>&1
