@@ -41,6 +41,16 @@ PlasmoidItem {
     property var preferredResolved: ({})
     property var pendingPreferred: ({})
 
+    // 顺序与配置的「上次推过的内容」。helper 重启会丢掉它那边的状态，
+    // 所以去重必须配合下面的 lastOwner 一起用：内容没变不推，
+    // 但 helper 换了一任就清掉记忆强推一次。
+    property string lastOrderPayload: ""
+    property string lastConfigText: ""
+    // helper 在 D-Bus 上的唯一名，用来发现它重启过。
+    property string lastOwner: ""
+    // 订阅连续没拿到内容的次数，用来做重试退避。
+    property int watchMisses: 0
+
     // 图标名缓存：应用标识 → 图标名/路径。
     // 为什么不直接猜：应用标识与图标名往往不一样（org.kde.kate 的图标叫 kate），
     // 而模型的 AppIconName 角色实测返回的是展示文本。最可靠的来源是 desktop
@@ -141,6 +151,7 @@ PlasmoidItem {
         }
     }
 
+
     // 应用标识里只保留安全字符，避免拼进命令时被注入。
     function safeAppId(appId) {
         var src = String(appId);
@@ -186,9 +197,16 @@ PlasmoidItem {
         if (root.pendingIcons[appId] === undefined) {
             var file = root.safeAppId(appId);
             if (file !== "") {
+                // appId 与 .desktop 文件名不一定相同：多数是 appId + ".desktop"，
+                // 也有 appId 自带后缀的，还有 Telegram 那种中间插一段哈希的
+                // （org.telegram.desktop._2255….desktop）。
+                // 只试 “$d/$appId” 一种写法的话，大多数应用都抠不到 Icon，
+                // 只好把 appId 当图标名用 —— 那就会和任务栏显示的对不上。
                 var cmd = "for d in \"$HOME/.local/share/applications\" /usr/share/applications "
                         + "/var/lib/flatpak/exports/share/applications; do "
-                        + "f=$d/" + file + "; [ -f \"$f\" ] && sed -n s/^Icon=//p \"$f\" | head -1; done";
+                        + "for f in \"$d/" + file + ".desktop\" \"$d/" + file + "\" "
+                        + "\"$d/" + file + "\".*.desktop; do "
+                        + "[ -f \"$f\" ] && sed -n s/^Icon=//p \"$f\" | head -1; done; done";
                 root.pendingIcons[cmd] = appId;
                 iconSource.connectSource(cmd);
             }
@@ -209,13 +227,15 @@ PlasmoidItem {
             if (file !== "") {
                 var cmd = "for d in \"$HOME/.local/share/applications\" /usr/share/applications "
                         + "/var/lib/flatpak/exports/share/applications; do "
+                        + "for f in \"$d/" + file + ".desktop\" \"$d/" + file + "\" "
+                        + "\"$d/" + file + "\".*.desktop; do "
                         // desktop 文件里只有英文 msgid；中文译文在 gettext 的 .mo 里。
                         // 必须给完整 locale（LC_ALL=zh_CN.UTF-8），只给 LANGUAGE 取不到。
-                        + "f=$d/" + file + "; [ -f \"$f\" ] && { "
+                        + "[ -f \"$f\" ] && { "
                         + "n=$(sed -n s/^Name=//p \"$f\" | head -1); "
                         + "LC_ALL=" + Qt.locale().name + ".UTF-8 "
                         + "gettext -d \"$(basename \"$f\" .desktop)\" \"$n\" 2>/dev/null "
-                        + "|| printf %s \"$n\"; }; done";
+                        + "|| printf %s \"$n\"; }; done; done";
                 root.pendingNames[cmd] = appId;
                 nameSource.connectSource(cmd);
             }
@@ -481,6 +501,11 @@ PlasmoidItem {
         var armed = 1200;
         // KWin 脚本用它决定：选到已在前台的窗口时，最小化还是只重新激活
         var minimizeActive = true;
+        // 失去焦点就收掉浮层
+        var closeOnFocusLoss = true;
+        // 弹出后的静默窗口（防手还在键盘上时误触），默认关
+        var keyGuardEnabled = false;
+        var keyGuardMillis = 300;
         try {
             position = String(plasmoid.configuration.overlayPosition);
             columns = Number(plasmoid.configuration.maxColumns);
@@ -496,6 +521,18 @@ PlasmoidItem {
             if (minimizeRaw !== undefined) {
                 minimizeActive = Boolean(minimizeRaw);
             }
+            var focusRaw = plasmoid.configuration.closeOnFocusLoss;
+            if (focusRaw !== undefined) {
+                closeOnFocusLoss = Boolean(focusRaw);
+            }
+            var guardRaw = plasmoid.configuration.keyGuardEnabled;
+            if (guardRaw !== undefined) {
+                keyGuardEnabled = Boolean(guardRaw);
+            }
+            var guardMsRaw = Number(plasmoid.configuration.keyGuardMillis);
+            if (guardMsRaw > 0) {
+                keyGuardMillis = guardMsRaw;
+            }
         } catch (e) {
             // 配置没读到就用默认值，不影响主流程
         }
@@ -504,7 +541,14 @@ PlasmoidItem {
                  + ";showTitle=" + (showTitle ? "1" : "0")
                  + ";bg=" + backgroundStyle
                  + ";armed=" + armed
-                 + ";minimizeActive=" + (minimizeActive ? "1" : "0");
+                 + ";minimizeActive=" + (minimizeActive ? "1" : "0")
+                 + ";closeOnFocusLoss=" + (closeOnFocusLoss ? "1" : "0")
+                 + ";keyGuard=" + (keyGuardEnabled ? "1" : "0")
+                 + ";keyGuardMillis=" + keyGuardMillis;
+        if (text === root.lastConfigText) {
+            return;
+        }
+        root.lastConfigText = text;
         // 必须加引号：命令是交给 shell 解释的，`;` 会被当成命令分隔符，
         // 结果只传过去第一段（踩过，和 `|` 被当管道同一类问题）。
         configSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
@@ -561,16 +605,60 @@ PlasmoidItem {
         return "";
     }
 
-    function pollLaunch() {
-        statusSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
-                                   + "io.github.conglinyizhi.winwitch.Status");
+    // 从等待脚本的输出里取 StateChanged 的信号体。
+    // gdbus 的输出形如：/winwitch: io.github.conglinyizhi.winwitch.StateChanged ('idle:t0\n…',)
+    // 它把换行与制表符写成字面量，这里还原回来，下游才能按真实换行切分。
+    function stateFromMonitor(raw) {
+        var lines = String(raw || "").split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            var marker = ".StateChanged ";
+            var at = lines[i].indexOf(marker);
+            if (at >= 0) {
+                var body = lines[i].substring(at + marker.length);
+                body = body.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+                var q = body.indexOf("'");
+                var lq = body.lastIndexOf("'");
+                if (q >= 0 && lq > q) {
+                    body = body.substring(q + 1, lq);
+                }
+                return body;
+            }
+        }
+        return "";
     }
 
-    Timer {
-        interval: 500
-        running: true
-        repeat: true
-        onTriggered: root.pollLaunch()
+    // 从等待脚本的输出里取 helper 在 D-Bus 上的唯一名。
+    // 输出形如：The name io.github.conglinyizhi.winwitch is owned by :1.59
+    function ownerFromMonitor(raw) {
+        var lines = String(raw || "").split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            var marker = " is owned by ";
+            var at = lines[i].indexOf(marker);
+            if (at >= 0) {
+                return lines[i].substring(at + marker.length).trim();
+            }
+        }
+        return "";
+    }
+
+    // helper 重启后，面板这边「推过了」的记忆就是错的：它那边什么都没有了。
+    // 清掉记忆再推一次，顺序与配置才能重新对上。
+    function forcePush() {
+        root.lastOrderPayload = "";
+        root.lastConfigText = "";
+        root.report("panel-helper-restarted");
+        root.pushOrder();
+        root.pushConfig();
+    }
+
+    // 订阅 helper 的状态推送（与浮层共用同一个等待脚本）。
+    //
+    // 以前是 500ms 轮询一次 Status：QML 调 D-Bus 只能 fork 一个 qdbus6，
+    // 再加上顺序与配置那两个 Timer，面板侧每秒要起好几个进程。
+    // 现在只有状态真的变了才醒，空闲时 30 秒才起一次。
+    function waitState() {
+        statusSource.connectSource("timeout 30 \"$HOME/.local/share/winwitch/winwitch-watch\" "
+                                   + "io.github.conglinyizhi.winwitch");
     }
 
     P5Support.DataSource {
@@ -580,12 +668,46 @@ PlasmoidItem {
         connectedSources: []
 
         onNewData: function (sourceName, data) {
-            var letter = root.launchLetterFrom(data["stdout"] || "");
-            if (letter !== "") {
-                root.handleLaunch(letter);
+            var out = data && data["stdout"] ? String(data["stdout"]) : "";
+            statusSource.disconnectSource(sourceName);
+
+            // 首次看到 owner（面板刚起来）也推一次：启动时 helper 可能还没上线，
+            // Component.onCompleted 那次推就落空了，靠这里补上。
+            var owner = root.ownerFromMonitor(out);
+            if (owner !== "" && owner !== root.lastOwner) {
+                root.lastOwner = owner;
+                root.forcePush();
             }
-            disconnectSource(sourceName);
+
+            var body = root.stateFromMonitor(out);
+            if (body !== "") {
+                var letter = root.launchLetterFrom(body);
+                if (letter !== "") {
+                    root.handleLaunch(letter);
+                }
+            }
+
+            // 重挂走 Timer，不在这个回调里直接调 waitState：
+            // 命令若立刻结束（脚本没跑起来之类），直接调会形成同步递归，
+            // QML 那边报 "Maximum call stack size exceeded"。
+            if (body !== "" || owner !== "") {
+                root.watchMisses = 0;
+                rewatchTimer.interval = 200;
+            } else {
+                root.watchMisses = Math.min(root.watchMisses + 1, 8);
+                rewatchTimer.interval = Math.min(30000, 400 * Math.pow(2, root.watchMisses));
+            }
+            rewatchTimer.restart();
         }
+    }
+
+    // 重挂订阅（见上面 onNewData 里的说明）。
+    Timer {
+        id: rewatchTimer
+
+        interval: 200
+        repeat: false
+        onTriggered: root.waitState()
     }
 
     P5Support.DataSource {
@@ -621,9 +743,12 @@ PlasmoidItem {
         }
     }
 
-    // 每次都推，不做「内容没变就跳过」的去重。
+    // 内容没变就不推（去重）。
+    //
     // 踩过的坑：helper 重启后之前推过的顺序就丢了，而面板以为自己推过了，
     // 于是永远不再推，字母静默退回 KWin 顺序（与任务栏对不上）。
+    // 所以去重必须配合 helper 重启的检测 —— 见 lastOwner 与 forcePush：
+    // 订阅里发现 owner 换人就把记忆清掉、重推一次。
     function pushOrder() {
         var built = root.buildSlots();
         var rows = built.rows;
@@ -656,6 +781,11 @@ PlasmoidItem {
         if (payload === "") {
             return;
         }
+        // 内容没变就不推。helper 重启的情况由 forcePush 兜住，不能只靠这里。
+        if (payload === root.lastOrderPayload) {
+            return;
+        }
+        root.lastOrderPayload = payload;
         orderSource.connectSource("qdbus6 io.github.conglinyizhi.winwitch /winwitch "
                                   + "io.github.conglinyizhi.winwitch.Order " + root.shellQuote(payload));
     }
@@ -671,8 +801,10 @@ PlasmoidItem {
     }
 
     // 固定应用列表会变（用户拖进拖出），定期重读。
+    // 15 秒是折中：每读一次都要起一条命令（sed 要过 shell），太密不值得；
+    // 拖完图标最多等这么久才会反映到字母顺序上。
     Timer {
-        interval: 5000
+        interval: 15000
         running: true
         repeat: true
         onTriggered: root.fetchLaunchers()
@@ -682,6 +814,15 @@ PlasmoidItem {
         root.fetchLaunchers();
         root.pushOrder();
         root.pushConfig();
+    }
+
+    // 订阅的启动不放在 Component.onCompleted 里串行执行：
+    // 上面任何一次推送抛异常，这里就轮不到，表现为「订阅根本没挂上」。
+    Timer {
+        interval: 500
+        running: true
+        repeat: false
+        onTriggered: root.waitState()
     }
 
     // 面板上的入口：一个小而淡的图标，点它直接弹出设置。
