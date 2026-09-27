@@ -2,7 +2,7 @@
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
         "Name": "WinWitch",
-        "Description": "WinWitch的面板侧组件：提供任务栏顺序与应用元信息，并承载设置入口。",
+        "Description": "Panel-side component: supplies the taskbar order and app metadata, and hosts the settings entry.",
         "Icon": "preferences-system-windows",
         "Id": "io.github.conglinyizhi.winwitch.panel",
         "License": "GPL-3.0-or-later",
