@@ -2,7 +2,7 @@
     "KPackageStructure": "KWin/Script",
     "KPlugin": {
         "Name": "WinWitch",
-        "Description": "按 Meta+F 后，用单个字母切换到对应窗口；Esc 立即取消。",
+        "Description": "Press Meta+F, then a single letter, to jump to that window. Esc cancels.",
         "Icon": "preferences-system-windows",
         "Id": "io.github.conglinyizhi.winwitch.kwin",
         "License": "GPL-3.0-or-later",
