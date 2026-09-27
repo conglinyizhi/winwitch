@@ -70,6 +70,16 @@ Window {
     property string positionSetting: "bottom"
     property int maxColumnsSetting: 6
     property bool showWindowTitle: true
+    // 失去焦点就收掉选择模式（默认开）
+    property bool closeOnFocusLoss: true
+    // 弹出后的静默窗口：这段时间内不理会按键（默认关）
+    property bool keyGuardEnabled: false
+    property int keyGuardMillis: 300
+    // 弹出时刻，用于算静默窗口
+    property double openedAt: 0
+    // 是否曾经拿到过键盘焦点（刚弹出时 requestActivate 是异步的，不能一看到
+    // active=false 就当成「失焦了」）
+    property bool wasActive: false
     // 背景风格：translucent=半透明 / opaque=完全不透明
     property string backgroundStyle: "translucent"
 
@@ -81,8 +91,9 @@ Window {
     readonly property color cardHoverColor: Qt.rgba(1, 1, 1, 0.14)
 
     property int pollFailures: 0
-    property bool useGdbus: false
     property bool announced: false
+    // 订阅连续没拿到内容的次数，用来做重试退避。
+    property int watchMisses: 0
 
     visible: overlay.selecting && overlay.rows.length > 0
     width: gridWidth + cardPadding * 2
@@ -103,11 +114,28 @@ Window {
     // 进入选择模式时抢焦点收键盘；退出时窗口隐藏，焦点自然还回去。
     onSelectingChanged: {
         if (overlay.selecting) {
+            overlay.openedAt = Date.now();
             overlay.requestActivate();
             keyCatcher.forceActiveFocus();
             // 让 KWin 稍后把位置摆正，见 repositionOverlay 的说明
             replaceEarly.restart();
             replaceLate.restart();
+        } else {
+            overlay.wasActive = false;
+        }
+    }
+
+    // 失去键盘焦点就收掉。
+    //
+    // 只在「确实拿到过焦点」之后才认这件事：刚弹出时 requestActivate 是异步的，
+    // 中间会有一小段 active = false，那时收掉的话浮层压根显示不出来。
+    onActiveChanged: {
+        if (overlay.active) {
+            overlay.wasActive = true;
+            return;
+        }
+        if (overlay.wasActive && overlay.selecting && overlay.closeOnFocusLoss) {
+            overlay.cancelSelection();
         }
     }
 
@@ -153,11 +181,9 @@ Window {
         return text;
     }
 
-    function statusCommand() {        if (overlay.useGdbus) {
-            return "gdbus call --session --dest " + overlay.serviceName
-                 + " --object-path " + overlay.objectPath
-                 + " --method " + overlay.interfaceName + ".Status";
-        }
+    // 只在启动、以及检测到 helper 重启之后查一次完整状态。
+    // 日常的状态变化走 StateChanged 推送，不再轮询。
+    function statusCommand() {
         return "qdbus6 " + overlay.serviceName + " " + overlay.objectPath
              + " " + overlay.interfaceName + ".Status";
     }
@@ -294,13 +320,11 @@ Window {
             return;
         }
 
+        // 状态解析不出来：可能是 30 秒超时兜底，也可能 helper 还没上线。
+        // 只记一次供排障，不影响流程（下一轮 waitState 会重新挂上）。
         overlay.pollFailures += 1;
         if (overlay.pollFailures === 5) {
             overlay.report("overlay-poll-failed-raw=" + (head === "" ? "empty" : head));
-            if (!overlay.useGdbus) {
-                overlay.useGdbus = true;
-                overlay.report("overlay-switch-to-gdbus");
-            }
         }
         if (overlay.pollFailures >= 20) {
             overlay.pollFailures = 0;
@@ -333,12 +357,55 @@ Window {
                 }
             } else if (key === "bg") {
                 overlay.backgroundStyle = (value === "opaque") ? "opaque" : "translucent";
+            } else if (key === "closeOnFocusLoss") {
+                overlay.closeOnFocusLoss = (value === "1");
+            } else if (key === "keyGuard") {
+                overlay.keyGuardEnabled = (value === "1");
+            } else if (key === "keyGuardMillis") {
+                var guardMs = parseInt(value, 10);
+                if (!isNaN(guardMs) && guardMs >= 0) {
+                    overlay.keyGuardMillis = guardMs;
+                }
             }
         }
     }
 
-    function pollStatus() {
-        commandSource.connectSource(overlay.statusCommand());
+    // 订阅 helper 的状态推送。
+    //
+    // 以前这里是个 250ms 的轮询：QML 调 D-Bus 只能 fork 一个 qdbus6 走命令行，
+    // 250ms 一次就是每秒 4 个进程（实测占全机进程创建量的两成）。
+    // 改成让 helper 推（StateChanged 信号），这里挂一条等待命令收。
+    //
+    // winwitch-watch 是配套的小脚本：等到一条信号就打印并退出。
+    // 为什么不直接写 `gdbus monitor … | head -3`：DataSource 是「命令结束后
+    // 才把输出交给 onNewData」，而 gdbus monitor 收到信号后不会自己退出，
+    // 整条命令要等外层 timeout 到点才结束，实时性就没了。
+    // 脚本内部用管道加显式 kill 解决这件事。
+    //
+    // 30 秒是兜底：这期间既没信号也没 helper 上下线，timeout 会收掉命令、
+    // 触发一次 onNewData，随后重新挂上。
+    function waitState() {
+        commandSource.connectSource(
+            "timeout 30 \"$HOME/.local/share/winwitch/winwitch-watch\" " + overlay.serviceName);
+    }
+
+    // 从 gdbus monitor 的输出里取出 StateChanged 的信号体。
+    // 输出形如：/winwitch: io.github.conglinyizhi.winwitch.StateChanged ('idle:t0',)
+    // 引号与 \n \t 的还原交给 applyStatus —— 它本来就要处理 gdbus 的转义写法。
+    function stateFromMonitor(raw) {
+        var lines = String(raw || "").split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            var marker = lines[i].indexOf(".StateChanged ");
+            if (marker >= 0) {
+                return lines[i].substring(marker + ".StateChanged ".length);
+            }
+        }
+        return "";
+    }
+
+    // 主动查一次当前状态。用在启动时，以及检测到 helper 重启之后。
+    function syncOnce() {
+        syncSource.connectSource(overlay.statusCommand());
     }
 
     // 选中一个字母（键盘按键或点击卡片都走这里）。
@@ -402,9 +469,52 @@ Window {
         connectedSources: []
 
         onNewData: function (sourceName, data) {
-            var out = data && data["stdout"] ? data["stdout"] : "";
+            var out = data && data["stdout"] ? String(data["stdout"]) : "";
             commandSource.disconnectSource(sourceName);
-            overlay.applyStatus(out);
+            var state = overlay.stateFromMonitor(out);
+            if (state !== "") {
+                overlay.applyStatus(state);
+            } else if (out.indexOf("is owned by") >= 0) {
+                // helper 刚上线或重启过：订阅是新的，但当前状态还不知道，
+                // 主动同步一次（否则要等下一次状态变化才能显示）。
+                overlay.syncOnce();
+            }
+            // 重挂走 Timer，不在这个回调里直接调 waitState：
+            // 命令若立刻结束（脚本没跑起来之类），直接调会形成同步递归，
+            // QML 那边报 "Maximum call stack size exceeded"。
+            if (state !== "" || out.indexOf("is owned by") >= 0) {
+                overlay.watchMisses = 0;
+                rewatchTimer.interval = 200;
+            } else {
+                overlay.watchMisses = Math.min(overlay.watchMisses + 1, 8);
+                rewatchTimer.interval = Math.min(30000, 400 * Math.pow(2, overlay.watchMisses));
+            }
+            rewatchTimer.restart();
+        }
+    }
+
+    // 重挂订阅（见上面 onNewData 里的说明）。
+    Timer {
+        id: rewatchTimer
+
+        interval: 200
+        repeat: false
+        onTriggered: overlay.waitState()
+    }
+
+    // 一次性查询专用（启动同步、helper 重启后同步），与常驻订阅分开。
+    P5Support.DataSource {
+        id: syncSource
+
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function (sourceName, data) {
+            syncSource.disconnectSource(sourceName);
+            var out = data && data["stdout"] ? String(data["stdout"]) : "";
+            if (out.trim() !== "") {
+                overlay.applyStatus(out);
+            }
         }
     }
 
@@ -440,11 +550,18 @@ Window {
         }
     }
 
+    // 启动：先查一次当前状态（helper 可能已经在选择模式里）。
+    Component.onCompleted: {
+        overlay.syncOnce();
+    }
+
+    // 订阅的启动不放在 Component.onCompleted 里串行执行：
+    // 上面那步若抛异常，这里就轮不到，表现为「订阅根本没挂上」。
     Timer {
-        interval: 250
+        interval: 500
         running: true
-        repeat: true
-        onTriggered: overlay.pollStatus()
+        repeat: false
+        onTriggered: overlay.waitState()
     }
 
     // 键盘接收：选择模式期间浮层持有焦点，字母落到这里而不是当前窗口。
@@ -456,6 +573,13 @@ Window {
 
         Keys.onPressed: function (event) {
             if (!overlay.selecting) {
+                return;
+            }
+            // 弹出后的静默窗口：手还在键盘上时，别把紧接着的下一个按键当成选择。
+            // 这段时间内一律不理，连 Esc 也先吞掉——它只持续几百毫秒。
+            if (overlay.keyGuardEnabled && overlay.keyGuardMillis > 0
+                    && Date.now() - overlay.openedAt < overlay.keyGuardMillis) {
+                event.accepted = true;
                 return;
             }
             if (event.key === Qt.Key_Escape) {
