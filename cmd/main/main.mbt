@@ -30,6 +30,25 @@ fn empty_reply() -> @dbus.Reply {
 }
 
 ///|
+/// 把当前状态广播给订阅者。
+///
+/// 以前是浮层与面板各自轮询 `Status`（250ms / 500ms 各一次），而 QML 侧
+/// 调 D-Bus 只能 fork 一个 qdbus6 走命令行，于是每秒起八九个进程。
+/// 改成推送：状态一变就广播，订阅方挂一条 `gdbus monitor` 收即可。
+fn emit_state_changed(server : @dbus.Server, state : String) -> Unit {
+  let encoder = @dbus.Encoder::new()
+  encoder.string(state)
+  let _ = @dbus.Server::emit_signal(
+    server,
+    object_path,
+    interface_name,
+    "StateChanged",
+    encoder.finish(),
+    "s",
+  )
+}
+
+///|
 /// 逐调用日志默认关闭。任务栏组件会持续轮询，默认打开会把日志刷满；
 /// 排障时用 `LETTERSWITCH_DEBUG=1` 启动 helper 即可打开。
 fn debug_enabled() -> Bool {
@@ -201,10 +220,18 @@ fn main {
       let session = @core.Session::new()
       println("winwitch: 就绪，对象路径 \{object_path}")
       server.serve(fn(
-        _server : @dbus.Server,
+        server : @dbus.Server,
         ctx : @dbus.DispatchCtx,
       ) -> @dbus.Reply? {
-        Some(dispatch(session, ctx))
+        // 处理前后各取一次快照，变了才广播。
+        // Status / Note 这类不改状态的调用自然不会触发。
+        let before = session.snapshot()
+        let reply = dispatch(session, ctx)
+        let after = session.snapshot()
+        if before != after {
+          emit_state_changed(server, after)
+        }
+        Some(reply)
       })
     }
   }
