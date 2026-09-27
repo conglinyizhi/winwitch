@@ -63,9 +63,22 @@ qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
     || echo "提示：KWin 重载失败，注销后重新登录即可生效。"
 sleep 1
 
-say "4/5 安装浮层"
+say "4/5 安装浮层与翻译"
 mkdir -p "$data_dir/overlay"
 install -m 644 "$repo/overlay/main.qml" "$data_dir/overlay/main.qml"
+# 浮层订阅 helper 状态用的等待脚本（QML 侧拿不到流式 D-Bus，只能靠它）
+install -m 755 "$repo/scripts/watch-state.sh" "$data_dir/winwitch-watch"
+# 界面文案的翻译。domain 必须与 Plasma 按组件 Id 推出来的那个一致，
+# 否则文件在、名字不对，界面依然是英文（不会报错，只会静默不生效）。
+locale_dir="$HOME/.local/share/locale"
+translation_domain="plasma_applet_io.github.conglinyizhi.winwitch.panel"
+if command -v msgfmt >/dev/null 2>&1; then
+    mkdir -p "$locale_dir/zh_CN/LC_MESSAGES"
+    msgfmt -o "$locale_dir/zh_CN/LC_MESSAGES/$translation_domain.mo" "$repo/po/zh_CN.po"
+    echo "已安装中文翻译：$locale_dir/zh_CN/LC_MESSAGES/$translation_domain.mo"
+else
+    echo "提示：未找到 msgfmt（gettext），跳过翻译安装，界面将显示英文"
+fi
 sed "s|@OVERLAY@|$data_dir/overlay/main.qml|" \
     "$repo/overlay/winwitch-overlay.sh" > "$bin_dir/winwitch-overlay"
 chmod 755 "$bin_dir/winwitch-overlay"
