@@ -52,6 +52,9 @@ pub fn introspection_xml() -> String {
     #|      <arg name="window_ids" type="s" direction="in"/>
     #|      <arg name="result" type="s" direction="out"/>
     #|    </method>
+    #|    <signal name="StateChanged">
+    #|      <arg name="state" type="s"/>
+    #|    </signal>
     #|  </interface>
     #|  <interface name="org.freedesktop.DBus.Introspectable">
     #|    <method name="Introspect">
