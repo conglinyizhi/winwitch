@@ -1,0 +1,96 @@
+# WinWitch 的简体中文翻译。
+#
+# 原文（msgid）是英文，写在 QML 里，形如 i18n("Appearance")。
+# domain 由 Plasma 按面板组件的 Id 推出来：
+#   plasma_applet_io.github.conglinyizhi.winwitch.panel
+# 所以编译出的 mo 必须叫这个名字，放进 locale 目录才会被加载。
+#
+# 编译（scripts/install.sh 与 reload.sh 会做）：
+#   msgfmt -o plasma_applet_io.github.conglinyizhi.winwitch.panel.mo po/zh_CN.po
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: winwitch\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: zh_CN\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# ---- 外观 ----
+msgid "Appearance"
+msgstr "外观"
+
+msgid "Overlay position"
+msgstr "浮层位置"
+
+msgid "Bottom center"
+msgstr "屏幕底部居中"
+
+msgid "Screen center"
+msgstr "屏幕中央"
+
+msgid "Top center"
+msgstr "屏幕顶部居中"
+
+msgid "Maximum columns"
+msgstr "最多列数"
+
+msgid "Show window title"
+msgstr "显示窗口标题"
+
+msgid "Show the window title under the app name"
+msgstr "在应用名下面显示窗口标题"
+
+msgid "Background style"
+msgstr "背景风格"
+
+msgid "Translucent"
+msgstr "半透明"
+
+msgid "Opaque"
+msgstr "完全不透明"
+
+# ---- 行为 ----
+msgid "Behavior"
+msgstr "行为"
+
+msgid "Selecting the foreground window:"
+msgstr "选到已在前台的窗口："
+
+msgid "Minimize it"
+msgstr "最小化它"
+
+msgid "When off, selecting the foreground window just brings it back to front"
+msgstr "关掉的话，选到已在前台的窗口只是把它重新带到前台"
+
+msgid "Launch confirm time:"
+msgstr "启动确认时间："
+
+msgid "%1 ms"
+msgstr "%1 毫秒"
+
+msgid "A pinned app that isn't running needs a second press within this time"
+msgstr "固定但未启动的应用，需要在此时长内再按一次才启动"
+
+msgid "Apps that aren't running need two presses"
+msgstr "未启动的应用按两次才启动"
+
+msgid "On focus loss:"
+msgstr "失去焦点："
+
+msgid "Close automatically"
+msgstr "自动关闭"
+
+msgid "Ignore keys after opening:"
+msgstr "弹出后忽略按键："
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "The overlay appears while your hands are still on the keyboard; this keeps the next key from being taken as a choice"
+msgstr "浮层弹出时手可能还在键盘上，避免下一个按键被当成选择"
+
+msgid "Ignore duration:"
+msgstr "忽略时长："
