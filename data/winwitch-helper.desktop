@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Letter Switch Helper
-Comment=WinWitch的会话状态服务（D-Bus）
+Name=WinWitch Helper
+Name[zh_CN]=WinWitch 会话服务
+Comment=WinWitch session-state service (D-Bus)
+Comment[zh_CN]=WinWitch 的会话状态服务（D-Bus）
 # @HELPER@ 由 scripts/install.sh 在安装时替换为真实路径。
 # stdbuf 不能省：MoonBit 的 stdout 重定向到文件时是全缓冲，不加就看不到日志。
 Exec=/usr/bin/stdbuf -oL -eL @HELPER@
