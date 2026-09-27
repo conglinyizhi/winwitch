@@ -24,7 +24,7 @@ import org.kde.kcmutils as KCM
 KCM.SimpleKCM {
     id: page
 
-    title: "外观"
+    title: i18n("Appearance")
 
     // 配置读取入口。脱离 Plasma 单独加载（检查脚本会这么干）时退化成空对象，
     // 所以这里用 typeof 判断而不是直接引用，避免 ReferenceError。
@@ -54,13 +54,13 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: positionBox
 
-            Kirigami.FormData.label: "浮层位置"
+            Kirigami.FormData.label: i18n("Overlay position")
             textRole: "text"
             valueRole: "value"
             model: [
-                { value: "bottom", text: "屏幕底部居中" },
-                { value: "center", text: "屏幕中央" },
-                { value: "top", text: "屏幕顶部居中" }
+                { value: "bottom", text: i18n("Bottom center") },
+                { value: "center", text: i18n("Screen center") },
+                { value: "top", text: i18n("Top center") }
             ]
             currentIndex: page.indexOfValue(positionBox, page.configSource.overlayPosition)
             onActivated: page.cfg_overlayPosition = currentValue
@@ -69,7 +69,7 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: columnsBox
 
-            Kirigami.FormData.label: "最多列数"
+            Kirigami.FormData.label: i18n("Maximum columns")
             from: 1
             to: 8
             value: page.configSource.maxColumns
@@ -79,8 +79,8 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: titleBox
 
-            Kirigami.FormData.label: "显示窗口标题"
-            text: "在应用名下面显示窗口标题"
+            Kirigami.FormData.label: i18n("Show window title")
+            text: i18n("Show the window title under the app name")
             checked: page.configSource.showWindowTitle
             onToggled: page.cfg_showWindowTitle = checked
         }
@@ -88,12 +88,12 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: styleBox
 
-            Kirigami.FormData.label: "背景风格"
+            Kirigami.FormData.label: i18n("Background style")
             textRole: "text"
             valueRole: "value"
             model: [
-                { value: "translucent", text: "半透明（能透出桌面）" },
-                { value: "opaque", text: "完全不透明" }
+                { value: "translucent", text: i18n("Translucent") },
+                { value: "opaque", text: i18n("Opaque") }
             ]
             currentIndex: page.indexOfValue(styleBox, page.configSource.backgroundStyle)
             onActivated: page.cfg_backgroundStyle = currentValue
